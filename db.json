@@ -1,0 +1,353 @@
+{
+  "accounts": [
+    {
+      "email": "bonaboss61@gmail.com",
+      "fullName": "BONABOSS61",
+      "balanceDemo": 10000,
+      "balanceLive": 1025,
+      "level": 23,
+      "xp": 11340,
+      "kycStatus": "VERIFIED",
+      "joinedTournaments": [],
+      "tournamentScores": {},
+      "weeklyProfit": 0
+    },
+    {
+      "email": "alphaquant@vertex.com",
+      "fullName": "AlphaQuant",
+      "balanceDemo": 25000,
+      "balanceLive": 4500,
+      "level": 8,
+      "xp": 1200,
+      "kycStatus": "VERIFIED",
+      "joinedTournaments": [
+        "silver-pro"
+      ],
+      "tournamentScores": {
+        "silver-pro": 1250
+      },
+      "weeklyProfit": 4500
+    },
+    {
+      "balanceDemo": 10000,
+      "balanceLive": 1025,
+      "isLive": false,
+      "level": 23,
+      "xp": 11340,
+      "badges": [],
+      "isLoggedIn": true,
+      "email": "celebguy01@gmail.com",
+      "fullName": "Chisom Michael ",
+      "kycStatus": "PENDING",
+      "referredBy": "BONABOSS",
+      "affiliateCode": "PHILIPCHIS",
+      "affiliateBalance": 0,
+      "referralsCount": 0,
+      "joinedTournaments": [],
+      "tournamentScores": {},
+      "weeklyProfit": 0,
+      "kycIdImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "kycSelfieImage": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "kycSubmittedAt": 1784291035476
+    }
+  ],
+  "transactions": [
+    {
+      "id": "tx_init_1",
+      "email": "alphaquant@vertex.com",
+      "type": "deposit",
+      "amount": 3000,
+      "bonus": 1500,
+      "channel": "Bank Wire (Manual)",
+      "status": "APPROVED",
+      "details": {
+        "bankName": "Chase Bank",
+        "accountNumber": "****5678",
+        "accountHolder": "AlphaQuant Holdings",
+        "reference": "VERTEX-TX-9912"
+      },
+      "timestamp": 1783684754251
+    },
+    {
+      "id": "tx_init_2",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 50,
+      "bonus": 25,
+      "channel": "Stripe / Card",
+      "status": "APPROVED",
+      "details": {
+        "reference": "ch_stripe_initial_bonus"
+      },
+      "timestamp": 1783943954251
+    },
+    {
+      "id": "tx_187831042",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 100,
+      "bonus": 50,
+      "channel": "Bank Wire (Manual)",
+      "status": "REJECTED",
+      "details": {
+        "bankName": "doyrrww",
+        "accountNumber": "9152000902",
+        "reference": "REF-33237"
+      },
+      "timestamp": 1784034467939,
+      "rejectedAt": 1784235869382
+    },
+    {
+      "id": "tx_603568372",
+      "email": "bonaboss61@gmail.com",
+      "type": "withdraw",
+      "amount": 100,
+      "bonus": 0,
+      "channel": "Flutterwave Payout (Bank Wire)",
+      "status": "REJECTED",
+      "details": {
+        "bankName": "OPay Digital Services",
+        "bankCode": "999992",
+        "accountNumber": "9152000902",
+        "accountHolder": "CHIECKKY",
+        "currency": "NGN"
+      },
+      "timestamp": 1784038098494,
+      "payoutCut": 30,
+      "payoutNet": 70,
+      "rejectedAt": 1784235871504
+    },
+    {
+      "id": "flw_390920916",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 2500,
+      "bonus": 1250,
+      "channel": "Flutterwave Gateway",
+      "status": "REJECTED",
+      "details": {
+        "currency": "USD",
+        "fullName": "BONABOSS61",
+        "initializedAt": 1784038377696
+      },
+      "timestamp": 1784038377696,
+      "rejectedAt": 1784235872898
+    },
+    {
+      "id": "flw_302680468",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 2500,
+      "bonus": 1250,
+      "channel": "Flutterwave Gateway",
+      "status": "REJECTED",
+      "details": {
+        "currency": "USD",
+        "fullName": "BONABOSS61",
+        "initializedAt": 1784038407991
+      },
+      "timestamp": 1784038407991,
+      "rejectedAt": 1784235874303
+    },
+    {
+      "id": "tx_845760462",
+      "email": "bonaboss61@gmail.com",
+      "type": "withdraw",
+      "amount": 100,
+      "bonus": 0,
+      "channel": "Flutterwave Payout (Bank Wire)",
+      "status": "REJECTED",
+      "details": {
+        "bankName": "Guaranty Trust Bank (GTB)",
+        "bankCode": "058",
+        "accountNumber": "9134105732",
+        "accountHolder": "TELLO",
+        "currency": "NGN"
+      },
+      "timestamp": 1784039184371,
+      "payoutCut": 5,
+      "payoutNet": 95,
+      "rejectedAt": 1784235875504
+    },
+    {
+      "id": "flw_224932158",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 100,
+      "bonus": 50,
+      "channel": "Flutterwave Gateway",
+      "status": "REJECTED",
+      "details": {
+        "currency": "USD",
+        "fullName": "BONABOSS61",
+        "initializedAt": 1784039632840
+      },
+      "timestamp": 1784039632840,
+      "rejectedAt": 1784235877394
+    },
+    {
+      "id": "tx_719977047",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 100,
+      "bonus": 0,
+      "channel": "Bank Transfer (Manual)",
+      "status": "REJECTED",
+      "details": {},
+      "timestamp": 1784123857860,
+      "rejectedAt": 1784235877723
+    },
+    {
+      "id": "tx_960743898",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 100,
+      "bonus": 0,
+      "channel": "Bank Transfer (Manual)",
+      "status": "REJECTED",
+      "details": {
+        "currency": "NGN",
+        "bankName": "Guaranty Trust Bank (GTB)",
+        "accountName": "Vertex Market Capital Ltd",
+        "accountNumber": "0854329011"
+      },
+      "timestamp": 1784123857939,
+      "rejectedAt": 1784235878382
+    },
+    {
+      "id": "flw_111922449",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 100,
+      "bonus": 50,
+      "channel": "Flutterwave Gateway",
+      "status": "REJECTED",
+      "details": {
+        "currency": "USD",
+        "fullName": "Test",
+        "initializedAt": 1784123873271
+      },
+      "timestamp": 1784123873271,
+      "rejectedAt": 1784235879922
+    },
+    {
+      "id": "flw_692955303",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 100,
+      "bonus": 50,
+      "channel": "Flutterwave Gateway",
+      "status": "REJECTED",
+      "details": {
+        "currency": "USD",
+        "fullName": "Test",
+        "initializedAt": 1784124531217
+      },
+      "timestamp": 1784124531217,
+      "rejectedAt": 1784235880543
+    },
+    {
+      "id": "flw_518651163",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 100,
+      "bonus": 50,
+      "channel": "Flutterwave Gateway",
+      "status": "REJECTED",
+      "details": {
+        "currency": "USD",
+        "fullName": "BONABOSS61",
+        "initializedAt": 1784124789793
+      },
+      "timestamp": 1784124789793,
+      "rejectedAt": 1784235882402
+    },
+    {
+      "id": "flw_105554688",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 100,
+      "bonus": 50,
+      "channel": "Flutterwave Gateway",
+      "status": "REJECTED",
+      "details": {
+        "currency": "USD",
+        "fullName": "Test",
+        "initializedAt": 1784125349924
+      },
+      "timestamp": 1784125349924,
+      "rejectedAt": 1784235883367
+    },
+    {
+      "id": "flw_825160138",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 100,
+      "bonus": 50,
+      "channel": "Flutterwave Gateway",
+      "status": "REJECTED",
+      "details": {
+        "currency": "USD",
+        "fullName": "Test",
+        "initializedAt": 1784125398232
+      },
+      "timestamp": 1784125398232,
+      "rejectedAt": 1784235883544
+    },
+    {
+      "id": "flw_830134469",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 50,
+      "bonus": 25,
+      "channel": "Flutterwave Gateway",
+      "status": "REJECTED",
+      "details": {
+        "currency": "USD",
+        "fullName": "BONABOSS61",
+        "initializedAt": 1784125737565
+      },
+      "timestamp": 1784125737565,
+      "rejectedAt": 1784235885103
+    },
+    {
+      "id": "flw_672136625",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 100,
+      "bonus": 50,
+      "channel": "Flutterwave Gateway",
+      "status": "REJECTED",
+      "details": {
+        "currency": "USD",
+        "fullName": "BONABOSS61",
+        "initializedAt": 1784127228276
+      },
+      "timestamp": 1784127228276,
+      "rejectedAt": 1784235885519
+    },
+    {
+      "id": "flw_482809338",
+      "email": "bonaboss61@gmail.com",
+      "type": "deposit",
+      "amount": 100,
+      "bonus": 50,
+      "channel": "Flutterwave Gateway",
+      "status": "REJECTED",
+      "details": {
+        "currency": "USD",
+        "fullName": "BONABOSS61",
+        "initializedAt": 1784127417495
+      },
+      "timestamp": 1784127417495,
+      "rejectedAt": 1784235887443
+    }
+  ],
+  "settings": {
+    "platformProfit": 1450,
+    "platformCutPercent": 5,
+    "minDeposit": 10,
+    "minWithdraw": 50,
+    "globalWinRate": 0
+  }
+}

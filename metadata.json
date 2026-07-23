@@ -1,0 +1,6 @@
+{
+  "name": "Vertex Market",
+  "description": "Vertex Market is a premium, high-fidelity cryptocurrency, OTC, and stock binary trading platform featuring an interactive real-time charting desk, technical analysis indicators, live simulator accounts, and automated market analytics powered by Gemini AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
