@@ -108,8 +108,8 @@ app.post('/api/auth/verify-otp', (req, res) => {
 
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
-  const db = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'db.json'), 'utf-8'));
-  const user = db.accounts.find((u) => u.email.toLowerCase() === email.toLowerCase());
+  const db = readDb();
+  const user = db.accounts.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
   
   if (!user) {
     res.status(401).json({ error: 'Incorrect email or password.' });
@@ -130,8 +130,8 @@ app.post('/api/auth/login', (req, res) => {
 app.post('/api/auth/reset-password', (req, res) => {
   const { email, otp, newPassword, securityAnswer } = req.body;
   const dbPath = path.join(process.cwd(), 'db.json');
-  const db = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-  const user = db.accounts.find((u) => u.email.toLowerCase() === email.toLowerCase());
+  const db = readDb();
+  const user = db.accounts.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
   
   if (!user) {
     res.status(404).json({ error: 'Account not found.' });
@@ -152,7 +152,7 @@ app.post('/api/auth/reset-password', (req, res) => {
   }
   
   user.password = newPassword;
-  fs.writeFileSync(dbPath, JSON.stringify(db, null, 2), 'utf-8');
+  writeDb(db);
   delete otpStore[email.toLowerCase()];
   
   res.json({ success: true });

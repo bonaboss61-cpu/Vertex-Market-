@@ -344,7 +344,7 @@ export default function AuthKycModal({
     setAuthError('');
     setIsLoading(true);
 
-    if (!fullName || !email || !password || !confirmPassword || !securityAnswer) {
+    if (!fullName || !email || !password || !confirmPassword) {
       setAuthError('All registration fields are required.');
       setIsLoading(false);
       return;

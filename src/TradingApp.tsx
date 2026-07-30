@@ -975,7 +975,7 @@ export default function App({ forceAdmin = false }: { forceAdmin?: boolean }) {
       />
 
       {/* Persistent Back-Office Floating Access Button */}
-      {true && (
+      {(account.isLoggedIn && account.email && account.email.toLowerCase() === 'bonaboss61@gmail.com') && (
         <button
           onClick={() => {
             playSynthSound('CLICK');
