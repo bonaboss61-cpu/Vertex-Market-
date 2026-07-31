@@ -9,16 +9,16 @@ const user = process.env.SQL_ADMIN_USER;
 const password = process.env.SQL_ADMIN_PASSWORD;
 
 if (!sqlHost) {
-  throw new Error("SQL_HOST must be set in environment variables.");
+  throw new Error("PGHOST must be set in environment variables.");
 }
 if (!sqlDbName) {
-  throw new Error("SQL_DB_NAME must be set in environment variables.");
+  throw new Error("PGDATABASE must be set in environment variables.");
 }
 if (!user) {
-  throw new Error("SQL_ADMIN_USER must be set in environment variables.");
+  throw new Error("PGUSER must be set in environment variables.");
 }
 if (!password) {
-  throw new Error("SQL_ADMIN_PASSWORD must be set in environment variables.");
+  throw new Error("PGPASSWORD must be set in environment variables.");
 }
 console.log(`Using user: ${user} to connect to database.`);
 

@@ -1,3 +1,5 @@
+import { auth } from '../lib/firebase.ts';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -294,52 +296,54 @@ export default function AuthKycModal({
   const winSound = () => onPlaySound?.('WIN');
 
   // Handle Login
+  
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
     setIsLoading(true);
 
     if (!email || !password) {
-      setAuthError('Please fill in all credentials.');
+      setAuthError('Email and password are required.');
       setIsLoading(false);
       return;
     }
 
     try {
-      const loginRes = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const loginData = await loginRes.json();
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      winSound();
+      if (onClearHistory) onClearHistory();
       
-      if (loginData.user) { setPendingUser(loginData.user); }
-      if (!loginData.success) {
-        setAuthError(loginData.error || 'Incorrect email or password.');
-        setIsLoading(false);
-        return;
+      const derivedName = email.split('@')[0].toUpperCase();
+      const accountData = {
+        email: email,
+        fullName: derivedName,
+        balanceDemo: 10000.0,
+        balanceLive: 0.0,
+        level: 1,
+        xp: 0,
+        isLive: false,
+        badges: [],
+        isLoggedIn: true,
+        kycStatus: 'UNVERIFIED',
+        joinedTournaments: [],
+        tournamentScores: {},
+        weeklyProfit: 0,
+      };
+
+      if (onReplaceAccount) {
+        onReplaceAccount(accountData);
       }
-      
-      const response = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email })
-      });
-      const data = await response.json();
-      if (data.success) {
-        setResendTimer(60);
-      }
-      setIsLoading(false);
-      setOtpStep(true);
-      onTriggerToast?.('LEVEL_UP', 'VERIFICATION REQUIRED', data.otp ? `Demo Mode OTP: ${data.otp}` : `We've sent a code to ${email} to confirm your login.`);
-    } catch (err) {
+      onTriggerToast?.('LEVEL_UP', 'LOGGED IN', `Welcome back, ${derivedName}!`);
+      onClose();
+    } catch (err: any) {
       console.error(err);
-      setAuthError('Failed to connect. Please try again.');
+      setAuthError(err.message || 'Incorrect email or password.');
+    } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSignUpSubmit = (e: React.FormEvent) => {
+  const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
     setIsLoading(true);
@@ -362,29 +366,55 @@ export default function AuthKycModal({
       return;
     }
 
-    setTimeout(async () => {
-      let otpMsg = `An OTP has been sent to ${email}.`;
-      try {
-        const response = await fetch('/api/auth/send-otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email })
-        });
-        const data = await response.json();
-        if (data.success) {
-          setResendTimer(60);
-          if (data.otp) otpMsg = `Demo Mode OTP: ${data.otp}`;
-        }
-      } catch (err) {
-        console.error(err);
-      }
-      setIsLoading(false);
-      setOtpStep(true);
-      onTriggerToast?.('LEVEL_UP', 'VERIFICATION REQUIRED', otpMsg);
-    }, 1500);
-  };
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Wait for auth state to propagate to fetch interceptor
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Register user in SQL DB via sync
+      const derivedName = fullName || email.split('@')[0].toUpperCase();
+      const accountData = {
+        email: email,
+        fullName: derivedName,
+        balanceDemo: 10000.0,
+        balanceLive: 0.0,
+        level: 1,
+        xp: 0,
+        isLive: false,
+        badges: [],
+        isLoggedIn: true,
+        kycStatus: 'UNVERIFIED',
+        joinedTournaments: [],
+        tournamentScores: {},
+        weeklyProfit: 0,
+      };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
+      const syncRes = await fetch('/api/user/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(accountData)
+      });
+      
+      if (!syncRes.ok) {
+        throw new Error('Failed to register account in database.');
+      }
+      
+      winSound();
+      if (onClearHistory) onClearHistory();
+      if (onReplaceAccount) {
+        onReplaceAccount(accountData);
+      }
+      onTriggerToast?.('LEVEL_UP', 'ACCOUNT CREATED', `Welcome to Vertex Options, ${derivedName}!`);
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      setAuthError(err.message || 'Failed to create account.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
     if (otpValue.length < 6) {
@@ -457,9 +487,9 @@ export default function AuthKycModal({
   // Pre-fill demo account for fast testing
   const handleUseDemoCreds = () => {
     clickSound();
-    setEmail('demo@vertexmarket.com');
-    setPassword('demo1234');
-    setFullName('Demo User');
+    setEmail('bonaboss61@gmail.com');
+    setPassword('vertex2026');
+    setFullName('Bona Boss');
   };
 
   // Drag and drop event handlers
