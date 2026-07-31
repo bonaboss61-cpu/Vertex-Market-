@@ -457,9 +457,9 @@ export default function AuthKycModal({
   // Pre-fill demo account for fast testing
   const handleUseDemoCreds = () => {
     clickSound();
-    setEmail('bonaboss61@gmail.com');
-    setPassword('vertex2026');
-    setFullName('Bona Boss');
+    setEmail('demo@vertexmarket.com');
+    setPassword('demo1234');
+    setFullName('Demo User');
   };
 
   // Drag and drop event handlers
@@ -1018,20 +1018,6 @@ export default function AuthKycModal({
                 ) : (
                   <span>Sign In to Terminal</span>
                 )}
-              </button>
-
-              <div className="relative my-2 flex items-center justify-center">
-                <div className="absolute inset-x-0 h-px bg-white/5"></div>
-                <span className="relative bg-[#090d16] px-3 text-[10px] text-gray-500 font-mono">OR DEVELOPMENT TESTING</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleUseDemoCreds}
-                className="w-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-emerald-500/30 text-gray-300 hover:text-white transition-all py-2 rounded text-xs font-medium flex items-center justify-center gap-1.5"
-              >
-                <Award className="w-4 h-4 text-emerald-500" />
-                <span>Fill with demo account settings</span>
               </button>
             </form>
               )}
