@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch.ts';
 import { auth } from '../lib/firebase.ts';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 /**
@@ -225,7 +226,7 @@ export default function AuthKycModal({
     setAuthError('');
     onTriggerToast?.('LEVEL_UP', 'SENDING OTP', `Requesting a new code for ${email}...`);
     try {
-      const response = await fetch('/api/auth/send-otp', {
+      const response = await apiFetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email })
@@ -324,7 +325,7 @@ export default function AuthKycModal({
         isLive: false,
         badges: [],
         isLoggedIn: true,
-        kycStatus: 'UNVERIFIED',
+        kycStatus: 'UNVERIFIED' as 'UNVERIFIED',
         joinedTournaments: [],
         tournamentScores: {},
         weeklyProfit: 0,
@@ -384,13 +385,13 @@ export default function AuthKycModal({
         isLive: false,
         badges: [],
         isLoggedIn: true,
-        kycStatus: 'UNVERIFIED',
+        kycStatus: 'UNVERIFIED' as 'UNVERIFIED',
         joinedTournaments: [],
         tournamentScores: {},
         weeklyProfit: 0,
       };
 
-      const syncRes = await fetch('/api/user/sync', {
+      const syncRes = await apiFetch('/api/user/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(accountData)
@@ -424,7 +425,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
     
     setIsLoading(true);
     try {
-      const response = await fetch('/api/auth/verify-otp', {
+      const response = await apiFetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp: otpValue })
@@ -453,7 +454,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
             isLive: false,
             badges: [],
             isLoggedIn: true,
-            kycStatus: 'UNVERIFIED',
+            kycStatus: 'UNVERIFIED' as 'UNVERIFIED',
             joinedTournaments: [],
             tournamentScores: {},
             weeklyProfit: 0,
@@ -567,7 +568,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
     }, 200);
 
     try {
-      const response = await fetch('/api/kyc/auto-verify', {
+      const response = await apiFetch('/api/kyc/auto-verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -640,7 +641,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
         return;
       }
       try {
-        const res = await fetch('/api/auth/send-otp', {
+        const res = await apiFetch('/api/auth/send-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email })
@@ -675,7 +676,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
       }
       
       try {
-        const res = await fetch('/api/auth/reset-password', {
+        const res = await apiFetch('/api/auth/reset-password', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, otp: otpValue, newPassword: password, securityAnswer })

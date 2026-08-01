@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch.ts';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -384,7 +385,7 @@ export default function Sidebar({
 
     setTimeout(async () => {
       try {
-        const response = await fetch('/api/gemini/analyze', {
+        const response = await apiFetch('/api/gemini/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -3,6 +3,7 @@
   "appId": "1:577594699149:web:8a625a7741e5ea6359a1c4",
   "apiKey": "AIzaSyB_DwW9RCbafyk5NMdaD6RwshohXRXkdCw",
   "authDomain": "argon-dispatcher-sms1d.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-vertexmarket-36d0fcf6-f0ce-4efe-8918-fdd5b4efd11a",
   "storageBucket": "argon-dispatcher-sms1d.firebasestorage.app",
   "messagingSenderId": "577594699149",
   "measurementId": "",

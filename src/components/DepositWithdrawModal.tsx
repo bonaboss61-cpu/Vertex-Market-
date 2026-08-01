@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch.ts';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -83,7 +84,7 @@ export default function DepositWithdrawModal({
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch('/api/settings');
+        const res = await apiFetch('/api/settings');
         if (res.ok) {
           const data = await res.json();
           if (data.settings && data.settings.cryptoAddresses) {
@@ -147,7 +148,7 @@ export default function DepositWithdrawModal({
   useEffect(() => {
     if (activeTab === 'history' && account.isLoggedIn && account.email) {
       setLoadingHistory(true);
-      fetch(`/api/user/transactions?email=${encodeURIComponent(account.email)}`)
+      apiFetch(`/api/user/transactions?email=${encodeURIComponent(account.email)}`)
         .then(res => res.json())
         .then(data => {
           if (data.success) {
@@ -366,7 +367,7 @@ export default function DepositWithdrawModal({
           if (activeTab === 'deposit') {
             try {
               if (paymentMethod === 'crypto') {
-                const response = await fetch('/api/user/transaction', {
+                const response = await apiFetch('/api/user/transaction', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -400,7 +401,7 @@ export default function DepositWithdrawModal({
                 return;
               }
 
-              const response = await fetch('/api/flutterwave/initialize', {
+              const response = await apiFetch('/api/flutterwave/initialize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -452,7 +453,7 @@ export default function DepositWithdrawModal({
               currency: 'NGN'
             };
 
-            const response = await fetch('/api/user/transaction', {
+            const response = await apiFetch('/api/user/transaction', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

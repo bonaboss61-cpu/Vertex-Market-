@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch.ts';
 import { Candlestick, Asset } from '../types';
 
 export const BINANCE_SYMBOLS: Record<string, string> = {
@@ -11,7 +12,7 @@ export async function fetchHistoricalData(asset: Asset): Promise<Candlestick[]> 
   if (asset.category === 'crypto' && BINANCE_SYMBOLS[asset.id]) {
     try {
       const symbol = BINANCE_SYMBOLS[asset.id];
-      const res = await fetch(`/api/klines?symbol=${symbol}`);
+      const res = await apiFetch(`/api/klines?symbol=${symbol}`);
       if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
       const data = await res.json();
       if (!Array.isArray(data)) throw new Error('Data is not an array');

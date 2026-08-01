@@ -1,3 +1,4 @@
+import { apiFetch } from './lib/apiFetch.ts';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -133,7 +134,7 @@ export default function App({ forceAdmin = false }: { forceAdmin?: boolean }) {
   const syncWithBackend = async (accToSync = account) => {
     if (!accToSync || !accToSync.email) return;
     try {
-      const response = await fetch('/api/user/sync', {
+      const response = await apiFetch('/api/user/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(accToSync)

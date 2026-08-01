@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/apiFetch.ts';
 import React, { useState, useEffect } from 'react';
 import { ShieldAlert, ChevronLeft, Users, Activity, Settings, DollarSign, Check, X as CloseIcon, TrendingUp, RefreshCw, AlertTriangle, Mail, UserCheck, Search } from 'lucide-react';
 import { UserAccount, Transaction, SystemSettings } from '../types';
@@ -21,7 +22,7 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
 
   const handleApproveKyc = async (email: string) => {
     try {
-      await fetch('/api/admin/kyc/approve', {
+      await apiFetch('/api/admin/kyc/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
@@ -35,7 +36,7 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
 
   const handleRejectKyc = async (email: string) => {
     try {
-      await fetch('/api/admin/kyc/reject', {
+      await apiFetch('/api/admin/kyc/reject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
@@ -50,7 +51,7 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/data');
+      const res = await apiFetch('/api/admin/data');
       if (res.ok) {
         const data = await res.json();
         setAccounts(data.accounts || []);
@@ -73,7 +74,7 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
 
   const handleApprove = async (txId: string) => {
     try {
-      const res = await fetch('/api/admin/approve', {
+      const res = await apiFetch('/api/admin/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ txId })
@@ -94,7 +95,7 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
 
   const handleReject = async (txId: string) => {
     try {
-      const res = await fetch('/api/admin/reject', {
+      const res = await apiFetch('/api/admin/reject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ txId })
@@ -112,7 +113,7 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
 
   const handleAdjustBalance = async (email: string, amount: number, balanceType: 'live' | 'demo') => {
     try {
-      const res = await fetch('/api/admin/adjust-balance', {
+      const res = await apiFetch('/api/admin/adjust-balance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, amount, balanceType })
@@ -132,7 +133,7 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
 
   const handleSaveSettings = async (newSettings: SystemSettings) => {
     try {
-      const res = await fetch('/api/admin/settings', {
+      const res = await apiFetch('/api/admin/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings)
@@ -415,7 +416,7 @@ function DiagnosticsTab() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch('/api/admin/test-email', { method: 'POST' });
+      const res = await apiFetch('/api/admin/test-email', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         setResult({ success: true, msg: data.message });
