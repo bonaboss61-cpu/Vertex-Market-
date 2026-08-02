@@ -10,7 +10,8 @@
       "kycStatus": "VERIFIED",
       "joinedTournaments": [],
       "tournamentScores": {},
-      "weeklyProfit": 0
+      "weeklyProfit": 0,
+      "password": "newpassword123"
     },
     {
       "email": "alphaquant@vertex.com",
