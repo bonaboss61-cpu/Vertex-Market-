@@ -4,6 +4,7 @@
  */
 import nodemailer from 'nodemailer';
 import express from 'express';
+import { adminAuth } from './src/lib/firebase-admin.ts';
 import path from 'path';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
@@ -19,6 +20,79 @@ import { eq, desc } from 'drizzle-orm';
 
 dotenv.config();
 const app = express();
+
+const otpStore: Record<string, { otp: string, expiresAt: number }> = {};
+
+app.post('/api/auth/send-otp', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    res.status(400).json({ error: 'Email is required' });
+    return;
+  }
+  
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  otpStore[email.toLowerCase()] = {
+    otp: otp,
+    expiresAt: Date.now() + 10 * 60 * 1000
+  };
+  
+  console.log(`\n======================================================`);
+  console.log(`[EMAIL MOCK] Verification Code generated for ${email}: ${otp}`);
+  console.log(`======================================================\n`);
+  
+  let emailSent = false;
+  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+    try {
+      const transporter = require('nodemailer').createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.GMAIL_USER,
+          pass: process.env.GMAIL_APP_PASSWORD
+        }
+      });
+      await transporter.sendMail({
+        from: '"Vertex Market" <' + process.env.GMAIL_USER + '>',
+        to: email,
+        subject: 'Your Vertex Market Verification Code',
+        text: `Your verification code is: ${otp}`,
+        html: `<p>Your verification code is: <strong>${otp}</strong></p>`
+      });
+      emailSent = true;
+    } catch (e) {
+      console.error('Failed to send email:', e);
+    }
+  }
+  
+  res.json({ success: true, message: 'OTP sent', otp: emailSent ? undefined : otp });
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { email, otp, newPassword, securityAnswer } = req.body;
+  
+  if (!email || !otp || !newPassword) {
+    res.status(400).json({ error: 'Missing required fields' });
+    return;
+  }
+  
+  const stored = otpStore[email.toLowerCase()];
+  if (!stored || stored.otp !== otp || stored.expiresAt < Date.now()) {
+    res.status(400).json({ error: 'Invalid or expired OTP' });
+    return;
+  }
+  
+  try {
+    const userRecord = await adminAuth.getUserByEmail(email);
+    await adminAuth.updateUser(userRecord.uid, {
+      password: newPassword
+    });
+    delete otpStore[email.toLowerCase()];
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (err: any) {
+    console.error('Error resetting password:', err);
+    res.status(400).json({ error: err.message || 'Failed to update password' });
+  }
+});
+
 app.set('trust proxy', true);
 const PORT = 3000;
 
