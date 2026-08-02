@@ -1,4 +1,5 @@
 import { apiFetch } from '../lib/apiFetch.ts';
+import { apiService } from '../services/apiService.ts';
 import React, { useState, useEffect } from 'react';
 import { ShieldAlert, ChevronLeft, Users, Activity, Settings, DollarSign, Check, X as CloseIcon, TrendingUp, RefreshCw, AlertTriangle, Mail, UserCheck, Search } from 'lucide-react';
 import { UserAccount, Transaction, SystemSettings } from '../types';
@@ -22,11 +23,7 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
 
   const handleApproveKyc = async (email: string) => {
     try {
-      await apiFetch('/api/admin/kyc/approve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
+      await apiService.approveKyc(email);
       fetchData();
       onTriggerToast('LEVEL_UP', 'KYC APPROVED', `Approved identity for ${email}`);
     } catch (err) {
@@ -36,11 +33,7 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
 
   const handleRejectKyc = async (email: string) => {
     try {
-      await apiFetch('/api/admin/kyc/reject', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
+      await apiService.rejectKyc(email);
       fetchData();
       onTriggerToast('LOSS', 'KYC REJECTED', `Rejected identity for ${email}`);
     } catch (err) {
@@ -51,9 +44,8 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch('/api/admin/data');
-      if (res.ok) {
-        const data = await res.json();
+      const data = await apiService.getAdminData();
+      if (data) {
         setAccounts(data.accounts || []);
         setTransactions(data.transactions || []);
         setSettings(data.settings || null);
@@ -74,18 +66,15 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
 
   const handleApprove = async (txId: string) => {
     try {
-      const res = await apiFetch('/api/admin/approve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ txId })
-      });
-      if (res.ok) {
+      const data = await apiService.approveTransaction(txId);
+      if (data && data.success) {
         onPlaySound('WIN');
         onTriggerToast('ACHIEVEMENT', 'TRANSACTION APPROVED', 'The transaction has been successfully approved.');
         fetchData();
         onRefreshUserBalance();
       } else {
-        const data = await res.json();
+        const res = await apiFetch('/api/admin/test-email', { method: 'POST' });
+      const data = await res.json();
         onTriggerToast('LOSS', 'APPROVAL FAILED', data.error || 'Failed to approve transaction.');
       }
     } catch (err) {
@@ -95,12 +84,8 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
 
   const handleReject = async (txId: string) => {
     try {
-      const res = await apiFetch('/api/admin/reject', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ txId })
-      });
-      if (res.ok) {
+      const data = await apiService.rejectTransaction(txId);
+      if (data && data.success) {
         onPlaySound('CLICK');
         onTriggerToast('ACHIEVEMENT', 'TRANSACTION REJECTED', 'The transaction has been rejected.');
         fetchData();
@@ -113,12 +98,8 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
 
   const handleAdjustBalance = async (email: string, amount: number, balanceType: 'live' | 'demo') => {
     try {
-      const res = await apiFetch('/api/admin/adjust-balance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, amount, balanceType })
-      });
-      if (res.ok) {
+      const data = await apiService.adjustBalance(email, balanceType, amount);
+      if (data && data.success) {
         onPlaySound('WIN');
         onTriggerToast('LEVEL_UP', 'BALANCE UPDATED', `Successfully adjusted ${balanceType} balance.`);
         fetchData();
@@ -133,12 +114,8 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
 
   const handleSaveSettings = async (newSettings: SystemSettings) => {
     try {
-      const res = await apiFetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSettings)
-      });
-      if (res.ok) {
+      const data = await apiService.updateSettings(newSettings);
+      if (data && data.success) {
         onPlaySound('WIN');
         onTriggerToast('ACHIEVEMENT', 'SETTINGS SAVED', 'Platform configuration updated successfully.');
         fetchData();
@@ -416,6 +393,7 @@ function DiagnosticsTab() {
     setLoading(true);
     setResult(null);
     try {
+      // const res = await apiFetch('/api/admin/test-email', { method: 'POST' });
       const res = await apiFetch('/api/admin/test-email', { method: 'POST' });
       const data = await res.json();
       if (data.success) {

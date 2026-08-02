@@ -1,4 +1,5 @@
 import { apiFetch } from '../lib/apiFetch.ts';
+import { apiService } from '../services/apiService.ts';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -84,11 +85,10 @@ export default function DepositWithdrawModal({
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await apiFetch('/api/settings');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.settings && data.settings.cryptoAddresses) {
-            setCryptoAddresses(data.settings.cryptoAddresses);
+        const settings = await apiService.getSettings();
+        if (settings) {
+          if (settings.cryptoAddresses) {
+            setCryptoAddresses(settings.cryptoAddresses);
           }
         }
       } catch (err) {}
@@ -148,12 +148,8 @@ export default function DepositWithdrawModal({
   useEffect(() => {
     if (activeTab === 'history' && account.isLoggedIn && account.email) {
       setLoadingHistory(true);
-      apiFetch(`/api/user/transactions?email=${encodeURIComponent(account.email)}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            setTransactions(data.transactions);
-          }
+      apiService.getUserTransactions(account.email).then(transactions => {
+            setTransactions(transactions);
         })
         .finally(() => {
           setLoadingHistory(false);
@@ -367,10 +363,7 @@ export default function DepositWithdrawModal({
           if (activeTab === 'deposit') {
             try {
               if (paymentMethod === 'crypto') {
-                const response = await apiFetch('/api/user/transaction', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
+                const data = await apiService.createTransaction({
                     email: account.email,
                     type: 'deposit',
                     amount: resolvedAmount,
@@ -381,12 +374,7 @@ export default function DepositWithdrawModal({
                       network: cryptoCurrency,
                       destinationAddress: cryptoAddresses[cryptoCurrency]
                     }
-                  })
-                });
-
-                if (!response.ok) throw new Error('Transaction failed');
-                const data = await response.json();
-                
+                  });
                 if (data.success) {
                   setCreatedTxId(data.transaction.id);
                   onUpdateAccount({ balanceLive: data.balanceLive });
@@ -453,25 +441,17 @@ export default function DepositWithdrawModal({
               currency: 'NGN'
             };
 
-            const response = await apiFetch('/api/user/transaction', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
+            const data = await apiService.createTransaction({
                 email: account.email,
                 type: 'withdraw',
                 amount: resolvedAmount,
                 bonus: 0,
                 channel: 'Flutterwave Payout (Bank Wire)',
                 details: detailsPayload
-              })
-            });
-
-            if (!response.ok) {
-              const errData = await response.json();
-              throw new Error(errData.error || 'Server rejected withdrawal request');
+              });
+            if (!data.success) {
+              throw new Error('Server rejected withdrawal request');
             }
-
-            const data = await response.json();
             if (data.success) {
               setCreatedTxId(data.transaction.id);
               onUpdateAccount({

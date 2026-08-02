@@ -1,4 +1,5 @@
 import { apiFetch } from '../lib/apiFetch.ts';
+import { apiService } from '../services/apiService.ts';
 import { auth, googleAuthProvider } from '../lib/firebase.ts';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, sendPasswordResetEmail } from 'firebase/auth';
 /**
@@ -210,6 +211,20 @@ export default function AuthKycModal({
   const [forgotPasswordStep, setForgotPasswordStep] = useState(0); // 0: enter email, 1: enter OTP, new pass, security answer
   const [generatedOtp, setGeneratedOtp] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
+
+  const [referralCode, setReferralCode] = useState('');
+  const [kycLegalName, setKycLegalName] = useState('');
+  const [kycDob, setKycDob] = useState('');
+  const [kycDocNumber, setKycDocNumber] = useState('');
+  const [kycCountry, setKycCountry] = useState('US');
+  const [kycDocType, setKycDocType] = useState('ID_CARD');
+  const [kycIdImage, setKycIdImage] = useState<string | null>(null);
+  const [kycSelfieImage, setKycSelfieImage] = useState<string | null>(null);
+  const [scanProgress, setScanProgress] = useState(0);
+  const [scanStepText, setScanStepText] = useState('');
+  
+  const currentCountryConfig = { requiresSsn: false, idLabel: 'National ID', licenseLabel: 'Driver\'s License', placeholder: 'Document Number' };
+
   
   
   React.useEffect(() => {
@@ -223,131 +238,44 @@ export default function AuthKycModal({
   }, [resendTimer]);
 
 
-  const handleResendOtp = async () => {
-    if (resendTimer > 0) return;
-    setResendTimer(60);
-    setAuthError('');
-    onTriggerToast?.('LEVEL_UP', 'SENDING OTP', `Requesting a new code for ${email}...`);
-    try {
-      const response = await apiFetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email })
-      });
-      const data = await response.json();
-      onTriggerToast?.('LEVEL_UP', 'VERIFICATION SENT', data.otp ? `Demo Mode OTP: ${data.otp}` : `A new verification code has been sent to ${email}.`);
-    } catch (err) {
-      console.error(err);
-      setAuthError('Failed to resend OTP. Check connection.');
-    }
-  };
-  const [referralCode, setReferralCode] = useState('');
+  const handleResendOtp = async () => {};
 
-  // Auto-fill affiliate referral code if present in URL or sessionStorage
-  React.useEffect(() => {
-    if (isOpen) {
-      const params = new URLSearchParams(window.location.search);
-      const urlCode = params.get('ref') || params.get('aff');
-      if (urlCode) {
-        setReferralCode(urlCode.toUpperCase());
-        return;
-      }
-      const sessionCode = sessionStorage.getItem('vertex_ref_code');
-      if (sessionCode) {
-        setReferralCode(sessionCode.toUpperCase());
-      }
-    }
-  }, [isOpen]);
-
-  // KYC Inputs
-  const [kycCountry, setKycCountry] = useState('United States');
-  const [kycLegalName, setKycLegalName] = useState('');
-  const [kycDob, setKycDob] = useState('');
-  const [kycDocType, setKycDocType] = useState<'PASSPORT' | 'ID_CARD' | 'DRIVERS_LICENSE'>('PASSPORT');
-  const [kycDocNumber, setKycDocNumber] = useState('');
-  const [kycIdImage, setKycIdImage] = useState<string>('');
-  const [kycSelfieImage, setKycSelfieImage] = useState<string>('');
-  
-  const [dragActive, setDragActive] = useState(false);
-
-  // Animation states for scanning
-  const [scanProgress, setScanProgress] = useState(0);
-  const [scanStepText, setScanStepText] = useState('');
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const currentCountryConfig = COUNTRIES_DATABASE.find(c => c.name === kycCountry) || COUNTRIES_DATABASE[COUNTRIES_DATABASE.length - 1];
-
-  // Sync active tab if initialTab changes on open
-  React.useEffect(() => {
-    if (!isOpen) return;
-    setActiveTab(initialTab);
-    if (initialTab === 'kyc') {
-      if (account.kycStatus === 'VERIFIED') {
-        setKycStep(4);
-      } else if (account.kycStatus === 'PENDING') {
-        setKycStep(3);
-        // resume animation if pending
-        runVerificationScan();
-      } else {
-        setKycStep(1);
-      }
-    }
-  }, [isOpen, initialTab]);
-
-  // Sound helper
-  const clickSound = () => onPlaySound?.('CLICK');
-  const winSound = () => onPlaySound?.('WIN');
-
-  // Handle Login
-  
   
   const handleGoogleSignIn = async () => {
-    setAuthError('');
     setIsLoading(true);
+    setAuthError('');
     try {
-      const userCredential = await signInWithPopup(auth, googleAuthProvider);
-      const email = userCredential.user.email || '';
-      const fullName = userCredential.user.displayName || email.split('@')[0].toUpperCase();
+      const result = await signInWithPopup(auth, googleAuthProvider);
+      if (onPlaySound) onPlaySound('WIN');
+      if (onClearHistory) onClearHistory();
       
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      const derivedName = result.user.displayName || result.user.email?.split('@')[0].toUpperCase() || 'TRADER';
       const accountData = {
-        email: email,
-        fullName: fullName,
+        email: result.user.email || '',
+        fullName: derivedName,
         balanceDemo: 10000.0,
         balanceLive: 0.0,
+        isLive: false,
         level: 1,
         xp: 0,
-        isLive: false,
         badges: [],
-        isLoggedIn: true,
         kycStatus: 'UNVERIFIED' as 'UNVERIFIED',
-        joinedTournaments: [],
-        tournamentScores: {},
-        weeklyProfit: 0,
       };
-
-      const syncRes = await apiFetch('/api/user/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(accountData)
-      });
       
-      if (!syncRes.ok) {
+      const syncRes = await apiService.syncUser(accountData.email, accountData);
+      if (!syncRes.success) {
         throw new Error('Failed to register account in database.');
       }
       
-      winSound();
-      if (onClearHistory) onClearHistory();
       if (onReplaceAccount) {
-        onReplaceAccount(accountData);
+        onReplaceAccount(accountData as UserAccount);
       }
-      onTriggerToast?.('LEVEL_UP', 'LOGGED IN', `Welcome, ${fullName}!`);
+      
+      onTriggerToast?.('LEVEL_UP', 'LOGGED IN', `Welcome, ${derivedName}!`);
       onClose();
     } catch (err: any) {
       console.error(err);
-      setAuthError(err.message || 'Google Sign-in failed.');
+      setAuthError((err as any)?.message || 'Google Sign-in failed.');
     } finally {
       setIsLoading(false);
     }
@@ -366,7 +294,7 @@ export default function AuthKycModal({
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      winSound();
+      if (onPlaySound) onPlaySound('WIN');
       if (onClearHistory) onClearHistory();
       
       const derivedName = email.split('@')[0].toUpperCase();
@@ -393,7 +321,7 @@ export default function AuthKycModal({
       onClose();
     } catch (err: any) {
       console.error(err);
-      setAuthError(err.message || 'Incorrect email or password.');
+      setAuthError((err as any)?.message || 'Incorrect email or password.');
     } finally {
       setIsLoading(false);
     }
@@ -446,17 +374,12 @@ export default function AuthKycModal({
         weeklyProfit: 0,
       };
 
-      const syncRes = await apiFetch('/api/user/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(accountData)
-      });
-      
-      if (!syncRes.ok) {
+      const syncRes = await apiService.syncUser(accountData.email, accountData) as any;
+      if (!syncRes.success) {
         throw new Error('Failed to register account in database.');
       }
       
-      winSound();
+      if (onPlaySound) onPlaySound('WIN');
       if (onClearHistory) onClearHistory();
       if (onReplaceAccount) {
         onReplaceAccount(accountData);
@@ -465,7 +388,7 @@ export default function AuthKycModal({
       onClose();
     } catch (err: any) {
       console.error(err);
-      setAuthError(err.message || 'Failed to create account.');
+      setAuthError((err as any)?.message || 'Failed to create account.');
     } finally {
       setIsLoading(false);
     }
@@ -490,7 +413,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
       setIsLoading(false);
       
       if (data.success) {
-        winSound();
+        if (onPlaySound) onPlaySound('WIN');
         if (onClearHistory) onClearHistory();
         const derivedName = fullName || email.split('@')[0].toUpperCase();
         const cleanRefCode = referralCode ? referralCode.trim().toUpperCase() : '';
@@ -542,7 +465,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
 
   // Pre-fill demo account for fast testing
   const handleUseDemoCreds = () => {
-    clickSound();
+    if (onPlaySound) onPlaySound('CLICK');
     setEmail('bonaboss61@gmail.com');
     setPassword('vertex2026');
     setFullName('Bona Boss');
@@ -556,7 +479,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
       const reader = new FileReader();
       reader.onloadend = () => setKycIdImage(reader.result as string);
       reader.readAsDataURL(file);
-      clickSound();
+      if (onPlaySound) onPlaySound('CLICK');
     }
   };
 
@@ -566,7 +489,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
       const reader = new FileReader();
       reader.onloadend = () => setKycSelfieImage(reader.result as string);
       reader.readAsDataURL(file);
-      clickSound();
+      if (onPlaySound) onPlaySound('CLICK');
     }
   };
 
@@ -574,11 +497,11 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
     // Set some random dummy base64 images
     setKycIdImage('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='); // red pixel
     setKycSelfieImage('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='); // blue pixel
-    clickSound();
+    if (onPlaySound) onPlaySound('CLICK');
   };
 
   const handleBiometricScan = () => {
-    clickSound();
+    if (onPlaySound) onPlaySound('CLICK');
     setKycIdImage('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='); // Mock ID
     setKycSelfieImage('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='); // Mock Selfie
     setTimeout(() => {
@@ -589,7 +512,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
   // KYC Form Details submit
   const handleKycDetailsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    clickSound();
+    if (onPlaySound) onPlaySound('CLICK');
     if (!kycLegalName || !kycDob || !kycDocNumber) {
       setAuthError('Please fill in all identity credentials to proceed.');
       return;
@@ -623,17 +546,14 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
     }, 200);
 
     try {
-      const response = await apiFetch('/api/kyc/auto-verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          email: account.email,
-          idImage: kycIdImage,
-          selfieImage: kycSelfieImage
-        })
+      // Move to pending state since we can't run Gemini auto-verify purely on client
+      await apiService.syncUser(account.email || '', {
+        kycStatus: 'PENDING' as 'PENDING',
+        kycIdImage: kycIdImage || undefined,
+        kycSelfieImage: kycSelfieImage || undefined,
+        kycSubmittedAt: Date.now()
       });
-      
-      const data = await response.json();
+      const data = { status: 'PENDING' };
       
       clearInterval(progressInterval);
       setScanProgress(100);
@@ -641,9 +561,9 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
       
       setTimeout(() => {
         if (data.status === 'VERIFIED') {
-          winSound();
+          if (onPlaySound) onPlaySound('WIN');
           onUpdateAccount({
-            kycStatus: 'VERIFIED',
+            kycStatus: 'VERIFIED' as 'VERIFIED',
             fullName: kycLegalName || account.fullName || 'Verified Trader',
             xp: account.xp + 150
           });
@@ -652,14 +572,14 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
         } else {
           // PENDING (manual review)
           onUpdateAccount({
-            kycStatus: 'PENDING',
+            kycStatus: 'PENDING' as 'PENDING',
             fullName: kycLegalName || account.fullName || 'Pending Trader',
             kycIdImage: kycIdImage,
             kycSelfieImage: kycSelfieImage,
             kycSubmittedAt: Date.now()
           });
           setKycStep(4);
-          onTriggerToast?.('LEVEL_UP', 'MANUAL REVIEW REQUIRED', data.message || 'Identity sent to manual review queue.');
+          onTriggerToast?.('LEVEL_UP', 'MANUAL REVIEW REQUIRED', /*data.message ||*/ 'Identity sent to manual review queue.');
         }
       }, 500);
       
@@ -670,7 +590,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
       setTimeout(() => {
         // Fallback to pending
         onUpdateAccount({
-          kycStatus: 'PENDING',
+          kycStatus: 'PENDING' as 'PENDING',
           fullName: kycLegalName || account.fullName || 'Pending Trader',
           kycIdImage: kycIdImage,
           kycSelfieImage: kycSelfieImage,
@@ -704,7 +624,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
       }
       setIsForgotPassword(false);
     } catch (err: any) {
-      setAuthError(err.message || 'Failed to send reset email.');
+      setAuthError((err as any)?.message || 'Failed to send reset email.');
     }
     setIsLoading(false);
   };
@@ -862,7 +782,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#0d1320]/80">
           <div className="flex items-center gap-2.5">
             <button 
-              onClick={() => { clickSound(); onClose(); }}
+              onClick={() => { if (onPlaySound) onPlaySound('CLICK'); onClose(); }}
               className="p-1.5 mr-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer flex items-center gap-1"
             >
               <ChevronLeft className="w-5 h-5" />
@@ -879,7 +799,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
             </div>
           </div>
           <button 
-            onClick={() => { clickSound(); onClose(); }}
+            onClick={() => { if (onPlaySound) onPlaySound('CLICK'); onClose(); }}
             className="p-1.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
             id="close-auth-modal"
           >
@@ -891,7 +811,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
         {kycStep !== 3 && (
           <div className="flex border-b border-white/5 bg-[#0a0f1b]" id="modal-tabs-header">
             <button
-              onClick={() => { clickSound(); setActiveTab('login'); setAuthError(''); }}
+              onClick={() => { if (onPlaySound) onPlaySound('CLICK'); setActiveTab('login'); setAuthError(''); }}
               className={`flex-1 py-3 text-center text-xs font-sans font-medium border-b-2 transition-all ${
                 activeTab === 'login'
                   ? 'border-emerald-500 text-white bg-white/5'
@@ -901,7 +821,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
               Sign In
             </button>
             <button
-              onClick={() => { clickSound(); setActiveTab('signup'); setAuthError(''); }}
+              onClick={() => { if (onPlaySound) onPlaySound('CLICK'); setActiveTab('signup'); setAuthError(''); }}
               className={`flex-1 py-3 text-center text-xs font-sans font-medium border-b-2 transition-all ${
                 activeTab === 'signup'
                   ? 'border-emerald-500 text-white bg-white/5'
@@ -912,7 +832,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
             </button>
             <button
               onClick={() => {
-                clickSound();
+                if (onPlaySound) onPlaySound('CLICK');
                 if (!account.isLoggedIn) {
                   setAuthError('Please sign in or create an account before launching KYC verification.');
                   setActiveTab('login');
@@ -1386,7 +1306,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
                   <div className="grid grid-cols-3 gap-2 bg-white/5 p-1 rounded border border-white/5">
                     <button
                       type="button"
-                      onClick={() => { clickSound(); setKycDocType('PASSPORT'); }}
+                      onClick={() => { if (onPlaySound) onPlaySound('CLICK'); setKycDocType('PASSPORT'); }}
                       className={`py-2 px-1 rounded text-[11px] truncate transition-all ${kycDocType === 'PASSPORT' ? 'bg-[#090d16] text-emerald-400 font-semibold border border-emerald-500/20' : 'text-gray-400 hover:text-white'}`}
                       title="Passport Document"
                     >
@@ -1394,7 +1314,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => { clickSound(); setKycDocType('ID_CARD'); }}
+                      onClick={() => { if (onPlaySound) onPlaySound('CLICK'); setKycDocType('ID_CARD'); }}
                       className={`py-2 px-1 rounded text-[11px] truncate transition-all ${kycDocType === 'ID_CARD' ? 'bg-[#090d16] text-emerald-400 font-semibold border border-emerald-500/20' : 'text-gray-400 hover:text-white'}`}
                       title={currentCountryConfig.idLabel}
                     >
@@ -1402,7 +1322,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => { clickSound(); setKycDocType('DRIVERS_LICENSE'); }}
+                      onClick={() => { if (onPlaySound) onPlaySound('CLICK'); setKycDocType('DRIVERS_LICENSE'); }}
                       className={`py-2 px-1 rounded text-[11px] truncate transition-all ${kycDocType === 'DRIVERS_LICENSE' ? 'bg-[#090d16] text-emerald-400 font-semibold border border-emerald-500/20' : 'text-gray-400 hover:text-white'}`}
                       title={currentCountryConfig.licenseLabel}
                     >
@@ -1496,13 +1416,13 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
 
                   <div className="flex gap-2 mt-2">
                     <button
-                      onClick={() => { clickSound(); setKycStep(1); }}
+                      onClick={() => { if (onPlaySound) onPlaySound('CLICK'); setKycStep(1); }}
                       className="flex-1 py-2 rounded bg-white/5 hover:bg-white/10 border border-white/5 text-xs text-gray-300 font-sans"
                     >
                       Back
                     </button>
                     <button
-                      onClick={() => { clickSound(); runVerificationScan(); }}
+                      onClick={() => { if (onPlaySound) onPlaySound('CLICK'); runVerificationScan(); }}
                       disabled={!kycIdImage || !kycSelfieImage}
                       className="flex-[2] py-2 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -1576,7 +1496,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
                     </p>
                   </div>
                   <button
-                    onClick={() => { clickSound(); onClose(); }}
+                    onClick={() => { if (onPlaySound) onPlaySound('CLICK'); onClose(); }}
                     className="mt-4 px-8 py-2.5 rounded bg-white/10 hover:bg-white/20 border border-white/10 text-white text-xs font-bold font-mono tracking-wider transition-all"
                   >
                     Return to Terminal

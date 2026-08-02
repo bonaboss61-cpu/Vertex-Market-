@@ -59,6 +59,7 @@ export interface UserAccount {
   email?: string;
   fullName?: string;
   kycStatus?: 'UNVERIFIED' | 'PENDING' | 'VERIFIED';
+  adminBalanceVersion?: number;
   kycDocumentType?: string;
   kycIdImage?: string;
   kycSelfieImage?: string;
@@ -144,6 +145,7 @@ export interface Transaction {
   bonus?: number;
   payoutCut?: number;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SETTLED_SUCCESS';
+  channel?: string;
   timestamp: number;
   approvedAt?: number;
   rejectedAt?: number;

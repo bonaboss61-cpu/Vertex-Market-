@@ -1,4 +1,5 @@
 import { apiFetch } from './lib/apiFetch.ts';
+import { apiService } from './services/apiService.ts';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -134,14 +135,8 @@ export default function App({ forceAdmin = false }: { forceAdmin?: boolean }) {
   const syncWithBackend = async (accToSync = account) => {
     if (!accToSync || !accToSync.email) return;
     try {
-      const response = await apiFetch('/api/user/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(accToSync)
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.account) {
+      const data = await apiService.syncUser(accToSync.email, accToSync);
+      if (data.success && data.account) {
           if (data.settings && data.settings.globalWinRate !== undefined) {
             setGlobalWinRate(data.settings.globalWinRate);
           }
@@ -162,7 +157,6 @@ export default function App({ forceAdmin = false }: { forceAdmin?: boolean }) {
             }));
           }
         }
-      }
     } catch (err) {
       console.warn('Real-time ledger sync offline. Operating in local sandbox.', err);
     }
