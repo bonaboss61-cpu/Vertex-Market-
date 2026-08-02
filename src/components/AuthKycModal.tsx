@@ -691,71 +691,22 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
     setAuthError('');
     setIsLoading(true);
     
-    if (forgotPasswordStep === 0) {
-      if (!email) {
-        setAuthError('Please enter your email.');
-        setIsLoading(false);
-        return;
-      }
-      try {
-        const res = await apiFetch('/api/auth/send-otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
-        });
-        const data = await res.json();
-        if (data.success) {
-           setResendTimer(60);
-           setForgotPasswordStep(1);
-           onTriggerToast?.('LEVEL_UP', 'OTP SENT', data.otp ? `Demo Mode OTP: ${data.otp}` : `Verification code sent to ${email}`);
-        } else {
-           setAuthError('Failed to send OTP.');
-        }
-      } catch (err) {
-        setAuthError('Network error.');
-      }
+    if (!email) {
+      setAuthError('Please enter your email.');
       setIsLoading(false);
-    } else {
-      if (!otpValue || !password || !securityAnswer) {
-        setAuthError('All fields are required.');
-        setIsLoading(false);
-        return;
-      }
-      if (password !== confirmPassword) {
-        setAuthError('Passwords do not match.');
-        setIsLoading(false);
-        return;
-      }
-      if (password.length < 6) {
-        setAuthError('Password must be at least 6 characters.');
-        setIsLoading(false);
-        return;
-      }
-      
-      try {
-        const res = await apiFetch('/api/auth/reset-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, otp: otpValue, newPassword: password, securityAnswer })
-        });
-        const data = await res.json();
-        
-        if (data.success) {
-           onTriggerToast?.('WIN', 'PASSWORD RESET', 'Your password has been successfully updated.');
-           setIsForgotPassword(false);
-           setForgotPasswordStep(0);
-           setOtpValue('');
-           setPassword('');
-           setConfirmPassword('');
-           setSecurityAnswer('');
-        } else {
-           setAuthError(data.error || 'Failed to reset password.');
-        }
-      } catch (err) {
-        setAuthError('Network error.');
-      }
-      setIsLoading(false);
+      return;
     }
+    
+    try {
+      await sendPasswordResetEmail(auth, email);
+      if (onTriggerToast) {
+        onTriggerToast('WIN', 'EMAIL SENT', `Password reset link sent to ${email}`);
+      }
+      setIsForgotPassword(false);
+    } catch (err: any) {
+      setAuthError(err.message || 'Failed to send reset email.');
+    }
+    setIsLoading(false);
   };
 
   
