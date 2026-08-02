@@ -1,12 +1,9 @@
 {
-  "projectId": "argon-dispatcher-sms1d",
-  "appId": "1:577594699149:web:8a625a7741e5ea6359a1c4",
-  "apiKey": "AIzaSyB_DwW9RCbafyk5NMdaD6RwshohXRXkdCw",
-  "authDomain": "argon-dispatcher-sms1d.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-vertexmarket-36d0fcf6-f0ce-4efe-8918-fdd5b4efd11a",
-  "storageBucket": "argon-dispatcher-sms1d.firebasestorage.app",
-  "messagingSenderId": "577594699149",
-  "measurementId": "",
-  "oAuthClientId": "577594699149-ar55su7eulrrrlusvp0rns2t5fo71je8.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "vertex-market",
+  "appId": "1:1003431014548:web:0a518856548f7c838b0481",
+  "apiKey": "AIzaSyBfferU0OLZaWb_-kbsRF5bQePPQyiEoPs",
+  "authDomain": "vertex-market.firebaseapp.com",
+  "storageBucket": "vertex-market.firebasestorage.app",
+  "messagingSenderId": "1003431014548",
+  "measurementId": "G-HW2MB0SFVW"
 }

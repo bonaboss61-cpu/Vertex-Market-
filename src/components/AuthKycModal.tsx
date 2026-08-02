@@ -1,6 +1,6 @@
 import { apiFetch } from '../lib/apiFetch.ts';
-import { auth } from '../lib/firebase.ts';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { auth, googleAuthProvider } from '../lib/firebase.ts';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -298,6 +298,58 @@ export default function AuthKycModal({
 
   // Handle Login
   
+  
+  const handleGoogleSignIn = async () => {
+    setAuthError('');
+    setIsLoading(true);
+    try {
+      const userCredential = await signInWithPopup(auth, googleAuthProvider);
+      const email = userCredential.user.email || '';
+      const fullName = userCredential.user.displayName || email.split('@')[0].toUpperCase();
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const accountData = {
+        email: email,
+        fullName: fullName,
+        balanceDemo: 10000.0,
+        balanceLive: 0.0,
+        level: 1,
+        xp: 0,
+        isLive: false,
+        badges: [],
+        isLoggedIn: true,
+        kycStatus: 'UNVERIFIED' as 'UNVERIFIED',
+        joinedTournaments: [],
+        tournamentScores: {},
+        weeklyProfit: 0,
+      };
+
+      const syncRes = await apiFetch('/api/user/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(accountData)
+      });
+      
+      if (!syncRes.ok) {
+        throw new Error('Failed to register account in database.');
+      }
+      
+      winSound();
+      if (onClearHistory) onClearHistory();
+      if (onReplaceAccount) {
+        onReplaceAccount(accountData);
+      }
+      onTriggerToast?.('LEVEL_UP', 'LOGGED IN', `Welcome, ${fullName}!`);
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      setAuthError(err.message || 'Google Sign-in failed.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
@@ -1003,6 +1055,23 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
                 </p>
               </div>
 
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
+                className="w-full bg-white hover:bg-gray-100 text-gray-900 font-sans font-semibold py-2.5 rounded text-xs transition-all shadow flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+              >
+                <Globe className="w-4 h-4" />
+                Sign in with Google
+              </button>
+              
+              <div className="flex items-center gap-2 my-2 opacity-50">
+                <div className="h-px bg-white/20 flex-1"></div>
+                <span className="text-[10px] uppercase font-mono tracking-wider">OR (Custom Firebase Only)</span>
+                <div className="h-px bg-white/20 flex-1"></div>
+              </div>
+
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] text-gray-500 font-mono tracking-wider uppercase">Email Address</label>
                 <div className="relative">
@@ -1126,6 +1195,23 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
                   Register a secure options profile. Standard account setup is instantaneous.
                 </p>
               </div>
+
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
+                className="w-full bg-white hover:bg-gray-100 text-gray-900 font-sans font-semibold py-2.5 rounded text-xs transition-all shadow flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+              >
+                <Globe className="w-4 h-4" />
+                Continue with Google
+              </button>
+              
+              <div className="flex items-center gap-2 my-2 opacity-50">
+                <div className="h-px bg-white/20 flex-1"></div>
+                <span className="text-[10px] uppercase font-mono tracking-wider">OR (Custom Firebase Only)</span>
+                <div className="h-px bg-white/20 flex-1"></div>
+              </div>
+
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-[10px] text-gray-500 font-mono tracking-wider uppercase">Full Name</label>
