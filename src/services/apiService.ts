@@ -143,11 +143,30 @@ export const apiService = {
         await setDoc(userRef, account);
       }
 
-      // Fetch settings
-      const settingsSnap = await getDoc(doc(db, 'system', 'settings'));
-      const settings = settingsSnap.exists() ? settingsSnap.data() as SystemSettings : undefined;
+     // Fetch settings separately.
+// Settings failure should NOT make account registration fail.
+let settings: SystemSettings | undefined;
 
-      return { success: true, account, settings };
+try {
+    const settingsSnap = await getDoc(
+        doc(db, 'system', 'settings')
+    );
+
+    settings = settingsSnap.exists()
+        ? settingsSnap.data() as SystemSettings
+        : undefined;
+} catch (settingsError) {
+    console.warn(
+        'Could not load system settings:',
+        settingsError
+    );
+}
+
+return {
+    success: true,
+    account,
+    settings
+};
     } catch (error) {
       console.error('Error syncing user:', error);
       return { success: false };
