@@ -167,10 +167,14 @@ return {
     account,
     settings
 };
-    } catch (error) {
-      console.error('Error syncing user:', error);
-      return { success: false };
-    }
+    } catch (error: any) {
+    console.error('Error syncing user:', error);
+
+    return {
+        success: false,
+        error: error?.message || String(error)
+    };
+}
   },
 
   async getUserTransactions(email: string): Promise<Transaction[]> {
