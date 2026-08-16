@@ -1113,7 +1113,7 @@ export default function TradingChart({ asset, history, activeTrades, completedTr
               onClick={() => {
                 playClick();
                 setAlertMode(!alertMode);
-                setDrawingMode(false);
+                setDrawingMode(null as any);
               }}
               className={`p-2 rounded-lg transition-all cursor-pointer hover:text-white ${
                 alertMode ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'text-gray-400'

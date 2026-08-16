@@ -57,12 +57,26 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
     setLoading(false);
   };
 
+  
   useEffect(() => {
     if (isOpen) {
       fetchData();
       onPlaySound('PLACE');
+      
+      const interval = setInterval(() => {
+        apiService.getAdminData().then(data => {
+          if (data) {
+            setAccounts(data.accounts || []);
+            setTransactions(data.transactions || []);
+            setSettings(data.settings || null);
+          }
+        }).catch(console.error);
+      }, 3000);
+      
+      return () => clearInterval(interval);
     }
   }, [isOpen]);
+
 
   const handleApprove = async (txId: string) => {
     try {
@@ -93,6 +107,24 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
       }
     } catch (err) {
       onTriggerToast('LOSS', 'NETWORK ERROR', 'Could not process request.');
+    }
+  };
+
+  
+  const handleDeleteUser = async (email: string) => {
+    if (window.confirm('Are you sure you want to delete ' + email + '?')) {
+      try {
+        const data = await apiService.deleteUser(email);
+        if (data && data.success) {
+          onPlaySound('WIN');
+          onTriggerToast('LEVEL_UP', 'USER DELETED', 'Successfully deleted ' + email);
+          fetchData();
+        } else {
+          onTriggerToast('LOSS', 'ERROR', 'Could not delete user.');
+        }
+      } catch (err) {
+        onTriggerToast('LOSS', 'NETWORK ERROR', 'Could not process request.');
+      }
     }
   };
 
@@ -142,10 +174,18 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
                 <span className="text-[10px] text-rose-400 uppercase tracking-wider font-bold">Admin Clearance Authorized</span>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors cursor-pointer">
-              <CloseIcon className="w-5 h-5" />
-            </button>
+            
+            <div className="flex items-center gap-3">
+              <button onClick={fetchData} className="p-2 bg-emerald-500/20 hover:bg-emerald-500/30 rounded-lg text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer flex items-center gap-2">
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <span className="text-[10px] font-bold uppercase tracking-wider">Sync</span>
+              </button>
+              <button onClick={onClose} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors cursor-pointer">
+                <CloseIcon className="w-5 h-5" />
+              </button>
+            </div>
           </div>
+
           
           <div className="flex flex-1 overflow-hidden">
             <div className="w-64 bg-[#0a0f1d] border-r border-white/5 p-4 flex flex-col gap-2 overflow-y-auto shrink-0">
@@ -165,7 +205,7 @@ export default function AdminPanel({ isOpen, onClose, onPlaySound, onTriggerToas
               ) : (
                 <>
                   {activeTab === 'dashboard' && <DashboardTab accounts={accounts} transactions={transactions} settings={settings} />}
-                  {activeTab === 'users' && <UsersTab accounts={accounts} onAdjustBalance={handleAdjustBalance} />}
+                  {activeTab === 'users' && <UsersTab accounts={accounts} onAdjustBalance={handleAdjustBalance} onDeleteUser={handleDeleteUser} />}
                   {activeTab === 'transactions' && <TransactionsTab transactions={transactions} onApprove={handleApprove} onReject={handleReject} />}
                   {activeTab === 'settings' && <SettingsTab settings={settings} onSave={handleSaveSettings} />}
                   {activeTab === 'diagnostics' && <DiagnosticsTab />}
@@ -222,7 +262,7 @@ function StatCard({ title, value, icon: Icon, color }: { title: string, value: s
   );
 }
 
-function UsersTab({ accounts, onAdjustBalance }: { accounts: UserAccount[], onAdjustBalance: (email: string, amount: number, type: 'live' | 'demo') => void }) {
+function UsersTab({ accounts, onAdjustBalance, onDeleteUser }: { accounts: UserAccount[], onAdjustBalance: (email: string, amount: number, type: 'live' | 'demo') => void, onDeleteUser: (email: string) => void }) {
   return (
     <div className="flex flex-col gap-4">
       <h3 className="text-lg font-bold text-white font-mono uppercase tracking-wider mb-2">Registered Users</h3>
@@ -231,8 +271,10 @@ function UsersTab({ accounts, onAdjustBalance }: { accounts: UserAccount[], onAd
           <div className="flex flex-col">
             <span className="text-white font-bold">{account.fullName}</span>
             <span className="text-xs text-gray-500">{account.email}</span>
+            <span className={`text-[10px] mt-1 font-mono uppercase tracking-wider ${account.kycStatus === 'VERIFIED' ? 'text-emerald-500' : account.kycStatus === 'PENDING' ? 'text-blue-500' : 'text-gray-500'}`}>KYC: {account.kycStatus}</span>
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
+            <button onClick={() => onDeleteUser(account.email!)} className="px-3 py-1 bg-rose-500/20 text-rose-500 hover:bg-rose-500/40 rounded text-[10px] uppercase font-bold tracking-wider mr-2">Delete</button>
             <div className="flex flex-col items-end">
               <span className="text-[10px] text-gray-500 uppercase font-mono">Live</span>
               <span className="text-emerald-400 font-bold font-mono">${account.balanceLive.toFixed(2)}</span>
@@ -457,6 +499,10 @@ function KycReviewTab({ accounts, onApproveKyc, onRejectKyc }: { accounts: UserA
                 <span className="text-white font-bold">{account.fullName}</span>
                 <span className="text-xs text-gray-500">{account.email}</span>
                 <span className="text-xs text-blue-400 mt-1 uppercase font-mono tracking-wider">Submitted: {new Date(account.kycSubmittedAt || 0).toLocaleString()}</span>
+                {account.kycDob && <span className="text-xs text-gray-400 mt-1 font-mono">DOB: {account.kycDob}</span>}
+                {account.kycCountry && <span className="text-xs text-gray-400 font-mono">Country: {account.kycCountry}</span>}
+                {account.kycDocType && <span className="text-xs text-gray-400 font-mono">Doc Type: {account.kycDocType}</span>}
+                {account.kycDocNumber && <span className="text-xs text-gray-400 font-mono">Doc Number: {account.kycDocNumber}</span>}
               </div>
               <div className="flex gap-2">
                 <button onClick={() => onApproveKyc(account.email!)} className="px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded text-xs font-bold font-mono tracking-wider hover:bg-emerald-500/30">Approve</button>
@@ -466,13 +512,23 @@ function KycReviewTab({ accounts, onApproveKyc, onRejectKyc }: { accounts: UserA
               </div>
             </div>
             
-            {/* Image Comparison View */}
-            <div className="grid grid-cols-2 gap-4 mt-2 p-3 bg-white/5 rounded-lg">
+                        {/* Image Comparison View */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2 p-3 bg-white/5 rounded-lg">
               <div className="flex flex-col gap-2">
-                <div className="text-xs font-mono text-gray-400 uppercase tracking-wider text-center">ID Document</div>
+                <div className="text-xs font-mono text-gray-400 uppercase tracking-wider text-center">ID Document (Front)</div>
                 {account.kycIdImage ? (
                   <div className="aspect-video bg-black/50 rounded flex items-center justify-center overflow-hidden border border-white/5 relative group">
-                    <img src={account.kycIdImage} alt="ID Document" className="w-full h-full object-contain" />
+                    <img src={account.kycIdImage} alt="ID Document Front" className="w-full h-full object-contain" />
+                  </div>
+                ) : (
+                  <div className="aspect-video bg-black/50 rounded flex items-center justify-center border border-white/5 text-gray-600 text-xs">No Image</div>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <div className="text-xs font-mono text-gray-400 uppercase tracking-wider text-center">ID Document (Back)</div>
+                {account.kycIdImageBack ? (
+                  <div className="aspect-video bg-black/50 rounded flex items-center justify-center overflow-hidden border border-white/5 relative group">
+                    <img src={account.kycIdImageBack} alt="ID Document Back" className="w-full h-full object-contain" />
                   </div>
                 ) : (
                   <div className="aspect-video bg-black/50 rounded flex items-center justify-center border border-white/5 text-gray-600 text-xs">No Image</div>

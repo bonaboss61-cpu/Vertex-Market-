@@ -1,4 +1,6 @@
-import { apiFetch } from '../lib/apiFetch.ts';
+const fs = require('fs');
+
+const newContent = `import { apiFetch } from '../lib/apiFetch.ts';
 import type { UserAccount, Transaction, SystemSettings } from '../types';
 
 export const apiService = {
@@ -16,22 +18,9 @@ export const apiService = {
     }
   },
 
-  
-  async deleteUser(email: string): Promise<{ success: boolean }> {
-    try {
-      const res = await apiFetch('/api/admin/users/' + encodeURIComponent(email), {
-        method: 'DELETE'
-      });
-      return await res.json();
-    } catch (e) {
-      console.error(e);
-      return { success: false };
-    }
-  },
-
   async getAdminData(): Promise<{ success: boolean; accounts?: UserAccount[]; transactions?: Transaction[]; settings?: SystemSettings }> {
     try {
-      const res = await apiFetch('/api/admin/data?t=' + Date.now());
+      const res = await apiFetch('/api/admin/data');
       return await res.json();
     } catch (e) {
       console.error(e);
@@ -105,28 +94,12 @@ export const apiService = {
     } catch (e) { return { success: false }; }
   },
 
-  
-  async autoVerifyKyc(payload: { email: string; idImage: string; idImageBack?: string; selfieImage: string; legalName?: string; dob?: string; docNumber?: string; docType?: string; country?: string }): Promise<{ success: boolean; status?: string; message?: string; error?: string }> {
-    try {
-      const res = await apiFetch('/api/kyc/auto-verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      return await res.json();
-    } catch (error: any) {
-      console.error('Error auto-verifying KYC:', error);
-      return { success: false, error: error.message };
-    }
-  },
-  
   async syncUser(email: string, userData: Partial<UserAccount>): Promise<{ success: boolean; account?: UserAccount; settings?: SystemSettings }> {
-
     try {
       const res = await apiFetch('/api/user/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, ...userData, kycIdImage: undefined, kycIdImageBack: undefined, kycSelfieImage: undefined })
+        body: JSON.stringify({ email, ...userData })
       });
       return await res.json();
     } catch (error) {
@@ -137,7 +110,7 @@ export const apiService = {
 
   async getUserTransactions(email: string): Promise<Transaction[]> {
     try {
-      const res = await apiFetch('/api/user/transactions?email=' + encodeURIComponent(email) + '&t=' + Date.now());
+      const res = await apiFetch('/api/user/transactions?email=' + encodeURIComponent(email));
       const data = await res.json();
       return data.transactions || [];
     } catch (error) {
@@ -162,7 +135,7 @@ export const apiService = {
 
   async getSettings(): Promise<SystemSettings | null> {
     try {
-      const res = await apiFetch('/api/settings?t=' + Date.now());
+      const res = await apiFetch('/api/settings');
       const data = await res.json();
       return data.settings || null;
     } catch (error) {
@@ -171,3 +144,6 @@ export const apiService = {
     }
   }
 };
+`;
+
+fs.writeFileSync('src/services/apiService.ts', newContent);

@@ -39,6 +39,33 @@ const otpStore: Record<string, { otp: string, expiresAt: number }> = {};
 
 
 // API: Send OTP for Verification
+
+app.post('/api/verify-recaptcha', async (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ success: false, error: 'No token provided' });
+  const secretKey = process.env.RECAPTCHA_SECRET_KEY;
+  if (!secretKey) {
+    // If not configured, just return success so dev isn't blocked
+    return res.json({ success: true, message: 'ReCAPTCHA ignored (not configured)' });
+  }
+
+  try {
+    const fetchRes = await fetch(`https://www.google.com/recaptcha/api/siteverify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `secret=${secretKey}&response=${token}`
+    });
+    const data = await fetchRes.json();
+    if (data.success) {
+      return res.json({ success: true });
+    } else {
+      return res.status(400).json({ success: false, error: 'ReCAPTCHA validation failed' });
+    }
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Error validating ReCAPTCHA' });
+  }
+});
+
 app.post('/api/auth/send-otp', async (req, res) => {
   const { email } = req.body;
   if (!email) {
@@ -265,7 +292,7 @@ Analyze this data and return the following JSON structure exactly:
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: userPrompt,
       config: {
         systemInstruction: systemPrompt,
@@ -365,62 +392,20 @@ function readDb() {
           joinedTournaments: [],
           tournamentScores: {},
           weeklyProfit: 0
-        },
-        {
-          email: "alphaquant@vertex.com",
-          fullName: "AlphaQuant",
-          balanceDemo: 25000.0,
-          balanceLive: 4500.0,
-          level: 8,
-          xp: 1200,
-          kycStatus: "VERIFIED",
-          joinedTournaments: ["silver-pro"],
-          tournamentScores: { "silver-pro": 1250 },
-          weeklyProfit: 4500
         }
       ],
-      transactions: [
-        {
-          id: "tx_init_1",
-          email: "alphaquant@vertex.com",
-          type: "deposit",
-          amount: 3000.0,
-          bonus: 1500.0,
-          channel: "Bank Wire (Manual)",
-          status: "APPROVED",
-          details: {
-            bankName: "Chase Bank",
-            accountNumber: "****5678",
-            accountHolder: "AlphaQuant Holdings",
-            reference: "VERTEX-TX-9912"
-          },
-          timestamp: Date.now() - 4 * 24 * 60 * 60 * 1000
-        },
-        {
-          id: "tx_init_2",
-          email: "bonaboss61@gmail.com",
-          type: "deposit",
-          amount: 50.0,
-          bonus: 25.0,
-          channel: "Stripe / Card",
-          status: "APPROVED",
-          details: {
-            reference: "ch_stripe_initial_bonus"
-          },
-          timestamp: Date.now() - 1 * 24 * 60 * 60 * 1000
-        }
-      ],
+      transactions: [],
       settings: {
-        platformProfit: 1450.0,
+        platformProfit: 0,
         platformCutPercent: 30,
         minDeposit: 10,
         minWithdraw: 20,
         globalWinRate: 50,
         cryptoAddresses: {
-          BTC: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
-          ETH: '0x71C7656EC7ab88b098defB751B7401B5f6d1476B',
-          USDT_TRC20: 'TXCdtvQp7Lsk6M5r9eKDu8VpTL5S89NdfA',
-          SOL: 'HN7cABviJHU7LsX1767bVpTL5SnF2G3K9vXb9Nd'
+          BTC: '',
+          ETH: '',
+          USDT_TRC20: '',
+          SOL: ''
         }
       }
     };
@@ -487,16 +472,6 @@ app.post('/api/user/sync', (req, res) => {
     existingUser.tournamentScores = userAccount.tournamentScores ?? existingUser.tournamentScores;
     existingUser.weeklyProfit = userAccount.weeklyProfit ?? existingUser.weeklyProfit;
     existingUser.fullName = userAccount.fullName ?? existingUser.fullName;
-    
-    // Only update KYC on server if the client provided a change (unverified -> pending / verified)
-    if (userAccount.kycStatus && userAccount.kycStatus !== existingUser.kycStatus) {
-      existingUser.kycStatus = userAccount.kycStatus;
-      if (userAccount.kycStatus === 'PENDING') {
-        existingUser.kycIdImage = userAccount.kycIdImage;
-        existingUser.kycSelfieImage = userAccount.kycSelfieImage;
-        existingUser.kycSubmittedAt = userAccount.kycSubmittedAt;
-      }
-    }
     
     // Accept client balance unless server has updated it (via admin/deposits)
     if (userAccount.adminBalanceVersion === existingUser.adminBalanceVersion || existingUser.adminBalanceVersion === undefined) {
@@ -845,6 +820,21 @@ app.get('/api/klines', async (req, res) => {
   }
 });
 
+
+app.delete('/api/admin/users/:email', (req, res) => {
+  const { email } = req.params;
+  const db = readDb();
+  const initialLength = db.accounts.length;
+  db.accounts = db.accounts.filter((u: any) => u.email.toLowerCase() !== email.toLowerCase());
+  
+  if (db.accounts.length < initialLength) {
+    writeDb(db);
+    res.json({ success: true, message: 'User deleted' });
+  } else {
+    res.status(404).json({ error: 'User not found' });
+  }
+});
+
 // 4. Admin API: Get All System Data
 app.get('/api/admin/data', (req, res) => {
   const db = readDb();
@@ -1067,7 +1057,7 @@ app.post('/api/admin/kyc/reject', (req, res) => {
 
 // Automated KYC Verification using Gemini
 app.post('/api/kyc/auto-verify', async (req, res) => {
-  const { email, idImage, selfieImage } = req.body;
+  const { email, idImage, idImageBack, selfieImage, legalName, dob, docNumber, docType, country } = req.body;
   if (!email || !idImage || !selfieImage) {
     return res.status(400).json({ error: 'Missing required KYC payload' });
   }
@@ -1079,8 +1069,14 @@ app.post('/api/kyc/auto-verify', async (req, res) => {
 
   // Update user with pending files immediately
   user.kycIdImage = idImage;
+  user.kycIdImageBack = idImageBack;
   user.kycSelfieImage = selfieImage;
   user.kycSubmittedAt = Date.now();
+  if (legalName) user.fullName = legalName;
+  if (dob) user.kycDob = dob;
+  if (docNumber) user.kycDocNumber = docNumber;
+  if (docType) user.kycDocType = docType;
+  if (country) user.kycCountry = country;
   
   // If Gemini is not configured, fall back to PENDING (manual review)
   if (!ai) {
@@ -1095,28 +1091,36 @@ app.post('/api/kyc/auto-verify', async (req, res) => {
     const selfieBase64 = selfieImage.split(',')[1];
     const idMime = idImage.split(';')[0].split(':')[1];
     const selfieMime = selfieImage.split(';')[0].split(':')[1];
-
-    const prompt = `You are an expert KYC compliance AI. Analyze the provided ID document and the user's selfie.
+    
+    let parts = [
+      { text: `You are an expert KYC compliance AI. Analyze the provided ID document(s) and the user's selfie.
     Determine if:
     1. The ID looks like a genuine, valid government-issued document (not a fake, not a toy).
     2. The face in the selfie matches the face in the ID document.
     3. The images are clear enough to read.
+    
+    If the image is not clear enough (blurry, obscured), set "unclear" to true, and explain it.
 
     Return JSON strictly in this format:
     {
       "verified": boolean,
+      "unclear": boolean,
       "reason": "short explanation of your decision"
+    }` },
+      { inlineData: { mimeType: idMime || 'image/jpeg', data: idBase64 || '' } },
+      { inlineData: { mimeType: selfieMime || 'image/jpeg', data: selfieBase64 || '' } }
+    ];
+
+    if (idImageBack) {
+       const idBackBase64 = idImageBack.split(',')[1];
+       const idBackMime = idImageBack.split(';')[0].split(':')[1];
+       parts.splice(2, 0, { inlineData: { mimeType: idBackMime || 'image/jpeg', data: idBackBase64 || '' } });
     }
-    `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.5-flash',
       contents: [
-        { role: 'user', parts: [
-          { text: prompt },
-          { inlineData: { mimeType: idMime || 'image/jpeg', data: idBase64 || '' } },
-          { inlineData: { mimeType: selfieMime || 'image/jpeg', data: selfieBase64 || '' } }
-        ]}
+        { role: 'user', parts: parts }
       ],
       config: {
         responseMimeType: "application/json"
@@ -1128,7 +1132,11 @@ app.post('/api/kyc/auto-verify', async (req, res) => {
     
     const analysis = JSON.parse(resultText);
 
-    if (analysis.verified) {
+    if (analysis.unclear) {
+      user.kycStatus = 'PENDING'; // Send to manual review even if AI thinks it is unclear
+      writeDb(db);
+      return res.json({ success: true, status: 'PENDING', message: analysis.reason });
+    } else if (analysis.verified) {
       user.kycStatus = 'VERIFIED';
       user.xp = (user.xp || 0) + 150; // XP reward
       writeDb(db);
@@ -1138,7 +1146,6 @@ app.post('/api/kyc/auto-verify', async (req, res) => {
       writeDb(db);
       return res.json({ success: true, status: 'PENDING', message: analysis.reason });
     }
-
   } catch (err: any) {
     console.error('KYC Auto-Verify Error:', err);
     // On AI failure, default to pending for manual review

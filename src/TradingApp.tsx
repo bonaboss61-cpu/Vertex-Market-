@@ -110,6 +110,12 @@ export default function App({ forceAdmin = false }: { forceAdmin?: boolean }) {
   // 10. Admin Back-Office dashboard controller state
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
   const [isAdminAuthOpen, setIsAdminAuthOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (forceAdmin) {
+      setIsAdminAuthOpen(true);
+    }
+  }, [forceAdmin]);
   const [adminPasscode, setAdminPasscode] = useState('');
 
   // Audio Context Ref for synthesizers

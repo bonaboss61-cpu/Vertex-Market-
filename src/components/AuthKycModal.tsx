@@ -8,6 +8,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithP
  */
 
 import React, { useState, useRef } from 'react';
+import ReCAPTCHA from 'react-google-recaptcha';
 import { 
   X, 
   Mail, 
@@ -212,13 +213,20 @@ export default function AuthKycModal({
   const [generatedOtp, setGeneratedOtp] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
 
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
+  const recaptchaSiteKey = (import.meta as any).env.VITE_RECAPTCHA_SITE_KEY || '';
+  
+
   const [referralCode, setReferralCode] = useState('');
   const [kycLegalName, setKycLegalName] = useState('');
   const [kycDob, setKycDob] = useState('');
   const [kycDocNumber, setKycDocNumber] = useState('');
   const [kycCountry, setKycCountry] = useState('US');
   const [kycDocType, setKycDocType] = useState('ID_CARD');
+  const [kycIdSideType, setKycIdSideType] = useState<'FRONT_ONLY' | 'FRONT_BACK'>('FRONT_BACK');
   const [kycIdImage, setKycIdImage] = useState<string | null>(null);
+  const [kycIdImageBack, setKycIdImageBack] = useState<string | null>(null);
   const [kycSelfieImage, setKycSelfieImage] = useState<string | null>(null);
   const [scanProgress, setScanProgress] = useState(0);
   const [scanStepText, setScanStepText] = useState('');
@@ -227,7 +235,15 @@ export default function AuthKycModal({
 
   
   
+  
   React.useEffect(() => {
+    if (account?.kycStatus === 'UNVERIFIED' && kycStep === 4) {
+      setKycStep(1);
+    }
+  }, [account?.kycStatus, kycStep]);
+
+  React.useEffect(() => {
+
     let interval: NodeJS.Timeout;
     if (resendTimer > 0) {
       interval = setInterval(() => {
@@ -262,14 +278,16 @@ export default function AuthKycModal({
         kycStatus: 'UNVERIFIED' as 'UNVERIFIED',
       };
       
-      const syncRes = await apiService.syncUser(accountData.email, accountData);
+      
+      const syncRes = await apiService.syncUser(accountData.email, { email: accountData.email, fullName: accountData.fullName });
       if (!syncRes.success) {
         throw new Error('Failed to register account in database.');
       }
       
       if (onReplaceAccount) {
-        onReplaceAccount(accountData as UserAccount);
+        onReplaceAccount({ ...syncRes.account, isLoggedIn: true } as any);
       }
+
       
       onTriggerToast?.('LEVEL_UP', 'LOGGED IN', `Welcome, ${derivedName}!`);
       onClose();
@@ -286,37 +304,50 @@ export default function AuthKycModal({
     setAuthError('');
     setIsLoading(true);
 
+    
     if (!email || !password) {
       setAuthError('Email and password are required.');
       setIsLoading(false);
       return;
     }
+    
+    if (recaptchaSiteKey && !recaptchaToken) {
+      setAuthError('Please complete the reCAPTCHA validation.');
+      setIsLoading(false);
+      return;
+    }
+    
+    if (recaptchaSiteKey && recaptchaToken) {
+      const rcRes = await apiService.verifyRecaptcha(recaptchaToken);
+      if (!rcRes.success) {
+        setAuthError(rcRes.error || 'ReCAPTCHA validation failed.');
+        setIsLoading(false);
+        if (recaptchaRef.current) recaptchaRef.current.reset();
+        setRecaptchaToken(null);
+        return;
+      }
+    }
+  
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       if (onPlaySound) onPlaySound('WIN');
       if (onClearHistory) onClearHistory();
       
+      
       const derivedName = email.split('@')[0].toUpperCase();
       const accountData = {
         email: email,
         fullName: derivedName,
-        balanceDemo: 10000.0,
-        balanceLive: 0.0,
-        level: 1,
-        xp: 0,
-        isLive: false,
-        badges: [],
-        isLoggedIn: true,
-        kycStatus: 'UNVERIFIED' as 'UNVERIFIED',
-        joinedTournaments: [],
-        tournamentScores: {},
-        weeklyProfit: 0,
+        isLoggedIn: true
       };
-
-      if (onReplaceAccount) {
-        onReplaceAccount(accountData);
+      const syncRes = await apiService.syncUser(accountData.email, accountData);
+      if (syncRes.success && syncRes.account) {
+        if (onReplaceAccount) onReplaceAccount({ ...syncRes.account, isLoggedIn: true } as any);
+      } else {
+        if (onReplaceAccount) onReplaceAccount(accountData as any);
       }
+
       onTriggerToast?.('LEVEL_UP', 'LOGGED IN', `Welcome back, ${derivedName}!`);
       onClose();
     } catch (err: any) {
@@ -332,11 +363,30 @@ export default function AuthKycModal({
     setAuthError('');
     setIsLoading(true);
 
+    
     if (!fullName || !email || !password || !confirmPassword) {
       setAuthError('All registration fields are required.');
       setIsLoading(false);
       return;
     }
+    
+    if (recaptchaSiteKey && !recaptchaToken) {
+      setAuthError('Please complete the reCAPTCHA validation.');
+      setIsLoading(false);
+      return;
+    }
+    
+    if (recaptchaSiteKey && recaptchaToken) {
+      const rcRes = await apiService.verifyRecaptcha(recaptchaToken);
+      if (!rcRes.success) {
+        setAuthError(rcRes.error || 'ReCAPTCHA validation failed.');
+        setIsLoading(false);
+        if (recaptchaRef.current) recaptchaRef.current.reset();
+        setRecaptchaToken(null);
+        return;
+      }
+    }
+  
 
     if (password !== confirmPassword) {
       setAuthError('Passwords do not match.');
@@ -473,25 +523,58 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
 
   // Drag and drop event handlers
   
-  const handleIdImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  
+  const compressImage = (file: File, maxWidth = 1000): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const scale = Math.min(maxWidth / img.width, 1);
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6)); // 60% quality JPEG
+        };
+        img.onerror = (e) => reject(e);
+      };
+      reader.onerror = (e) => reject(e);
+    });
+  };
+
+  const handleIdImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onloadend = () => setKycIdImage(reader.result as string);
-      reader.readAsDataURL(file);
+      const base64 = await compressImage(file);
+      setKycIdImage(base64);
+      if (onPlaySound) onPlaySound('CLICK');
+    }
+  };
+  
+  const handleIdImageBackChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const base64 = await compressImage(file);
+      setKycIdImageBack(base64);
       if (onPlaySound) onPlaySound('CLICK');
     }
   };
 
-  const handleSelfieImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelfieImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onloadend = () => setKycSelfieImage(reader.result as string);
-      reader.readAsDataURL(file);
+      const base64 = await compressImage(file);
+      setKycSelfieImage(base64);
       if (onPlaySound) onPlaySound('CLICK');
     }
   };
+
+  
+  
 
   const handleUploadDummy = () => {
     // Set some random dummy base64 images
@@ -503,6 +586,9 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
   const handleBiometricScan = () => {
     if (onPlaySound) onPlaySound('CLICK');
     setKycIdImage('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='); // Mock ID
+    if (kycIdSideType === 'FRONT_BACK') {
+      setKycIdImageBack('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='); // Mock ID Back
+    }
     setKycSelfieImage('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='); // Mock Selfie
     setTimeout(() => {
       runVerificationScan();
@@ -546,20 +632,23 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
     }, 200);
 
     try {
-      // Move to pending state since we can't run Gemini auto-verify purely on client
-      await apiService.syncUser(account.email || '', {
-        kycStatus: 'PENDING' as 'PENDING',
-        kycIdImage: kycIdImage || undefined,
-        kycSelfieImage: kycSelfieImage || undefined,
-        kycSubmittedAt: Date.now()
+      const data = await apiService.autoVerifyKyc({
+        email: account.email || '',
+        idImage: kycIdImage || '',
+        idImageBack: kycIdSideType === 'FRONT_BACK' ? (kycIdImageBack || undefined) : undefined,
+        selfieImage: kycSelfieImage || '',
+        legalName: kycLegalName,
+        dob: kycDob,
+        docNumber: kycDocNumber,
+        docType: kycDocType,
+        country: kycCountry
       });
-      const data = { status: 'PENDING' };
       
       clearInterval(progressInterval);
       setScanProgress(100);
       setScanStepText('Verification complete.');
       
-      setTimeout(() => {
+            setTimeout(() => {
         if (data.status === 'VERIFIED') {
           if (onPlaySound) onPlaySound('WIN');
           onUpdateAccount({
@@ -569,17 +658,31 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
           });
           setKycStep(4);
           onTriggerToast?.('WIN', 'IDENTITY VERIFIED', 'Congratulations! Your KYC is approved. Real-funds Live Trading is unlocked!');
+        } else if (data.status === 'UNCLEAR') {
+          onUpdateAccount({
+            kycStatus: 'UNVERIFIED' as 'UNVERIFIED',
+            fullName: kycLegalName || account.fullName || 'Unverified Trader',
+            kycIdImage: undefined,
+            kycIdImageBack: undefined,
+            kycSelfieImage: undefined
+          });
+          setKycStep(2);
+          setKycIdImage(null);
+          setKycIdImageBack(null);
+          setKycSelfieImage(null);
+          onTriggerToast?.('ERROR', 'AI VERIFICATION FAILED', data.message || 'Images were not clear. Please try again.');
         } else {
           // PENDING (manual review)
           onUpdateAccount({
             kycStatus: 'PENDING' as 'PENDING',
             fullName: kycLegalName || account.fullName || 'Pending Trader',
             kycIdImage: kycIdImage,
+            kycIdImageBack: kycIdImageBack,
             kycSelfieImage: kycSelfieImage,
             kycSubmittedAt: Date.now()
           });
           setKycStep(4);
-          onTriggerToast?.('LEVEL_UP', 'MANUAL REVIEW REQUIRED', /*data.message ||*/ 'Identity sent to manual review queue.');
+          onTriggerToast?.('LEVEL_UP', 'MANUAL REVIEW REQUIRED', data.message || 'Identity sent to manual review queue.');
         }
       }, 500);
       
@@ -741,8 +844,8 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
                 </>
               )}
               
-              <button
-                type="submit"
+              
+  <button type="submit"
                 disabled={isLoading}
                 className="w-full mt-4 bg-emerald-500 hover:bg-emerald-400 text-white py-2.5 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
@@ -904,8 +1007,8 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
                   )}
 
                   <div className="pt-2">
-                    <button
-                      type="submit"
+                    
+  <button type="submit"
                       disabled={isLoading}
                       className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-sans tracking-wide py-2.5 rounded-md transition-all active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center"
                     >
@@ -991,11 +1094,23 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-sans font-semibold py-2.5 rounded text-xs transition-all shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
-              >
+              
+  
+  {recaptchaSiteKey && (
+    <div className="flex justify-center my-2">
+      <ReCAPTCHA
+        ref={recaptchaRef}
+        sitekey={recaptchaSiteKey}
+        onChange={(val) => setRecaptchaToken(val)}
+        theme="dark"
+      />
+    </div>
+  )}
+
+<button type="submit"
+disabled={isLoading}
+className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-sans font-semibold py-2.5 rounded text-xs transition-all shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+>
                 {isLoading ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1052,8 +1167,8 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
                   )}
 
                   <div className="pt-2">
-                    <button
-                      type="submit"
+                    
+  <button type="submit"
                       disabled={isLoading}
                       className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold font-sans tracking-wide py-2.5 rounded-md transition-all active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center"
                     >
@@ -1200,11 +1315,23 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
                 </label>
               </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-sans font-semibold py-2.5 rounded text-xs transition-all shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
-              >
+              
+  
+  {recaptchaSiteKey && (
+    <div className="flex justify-center my-2">
+      <ReCAPTCHA
+        ref={recaptchaRef}
+        sitekey={recaptchaSiteKey}
+        onChange={(val) => setRecaptchaToken(val)}
+        theme="dark"
+      />
+    </div>
+  )}
+
+<button type="submit"
+disabled={isLoading}
+className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-sans font-semibold py-2.5 rounded text-xs transition-all shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+>
                 {isLoading ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1358,8 +1485,8 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
+                  
+  <button type="submit"
                     className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-sans font-semibold py-2.5 rounded text-xs transition-all shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-1.5 mt-2"
                   >
                     <span>Proceed to Document Upload</span>
@@ -1400,11 +1527,31 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
                       <div className="h-px bg-white/10 flex-1"></div>
                     </div>
 
+                    <div className="border border-white/10 rounded-lg p-3 bg-white/5 flex flex-col gap-2">
+                      <label className="text-xs text-white font-mono uppercase block">ID Type format</label>
+                      <select 
+                        value={kycIdSideType} 
+                        onChange={(e) => setKycIdSideType(e.target.value as 'FRONT_ONLY' | 'FRONT_BACK')}
+                        className="bg-[#0a0f1d] border border-white/10 rounded p-2 text-xs text-white outline-none"
+                      >
+                        <option value="FRONT_BACK">Standard ID (Front & Back)</option>
+                        <option value="FRONT_ONLY">Front Only (e.g., NIN)</option>
+                      </select>
+                    </div>
+
                     <div className="border border-white/10 rounded-lg p-3 bg-white/5">
                       <label className="text-xs text-white font-mono uppercase block mb-2">ID Document (Front)</label>
                       <input type="file" onChange={handleIdImageChange} accept="image/*" className="text-xs text-gray-400 w-full file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-emerald-500/20 file:text-emerald-400 hover:file:bg-emerald-500/30" />
-                      {kycIdImage && <div className="mt-2 text-xs text-emerald-400 font-mono">ID Uploaded ✓</div>}
+                      {kycIdImage && <div className="mt-2 text-xs text-emerald-400 font-mono">ID Front Uploaded ✓</div>}
                     </div>
+                    
+                    {kycIdSideType === 'FRONT_BACK' && (
+                      <div className="border border-white/10 rounded-lg p-3 bg-white/5">
+                        <label className="text-xs text-white font-mono uppercase block mb-2">ID Document (Back)</label>
+                        <input type="file" onChange={handleIdImageBackChange} accept="image/*" className="text-xs text-gray-400 w-full file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-emerald-500/20 file:text-emerald-400 hover:file:bg-emerald-500/30" />
+                        {kycIdImageBack && <div className="mt-2 text-xs text-emerald-400 font-mono">ID Back Uploaded ✓</div>}
+                      </div>
+                    )}
 
                     <div className="border border-white/10 rounded-lg p-3 bg-white/5">
                       <label className="text-xs text-white font-mono uppercase block mb-2">Self-Portrait (Selfie)</label>
@@ -1423,7 +1570,7 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
                     </button>
                     <button
                       onClick={() => { if (onPlaySound) onPlaySound('CLICK'); runVerificationScan(); }}
-                      disabled={!kycIdImage || !kycSelfieImage}
+                      disabled={!kycIdImage || (kycIdSideType === 'FRONT_BACK' && !kycIdImageBack) || !kycSelfieImage}
                       className="flex-[2] py-2 rounded bg-emerald-500 hover:bg-emerald-400 text-white font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Submit & Scan

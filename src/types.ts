@@ -62,8 +62,13 @@ export interface UserAccount {
   adminBalanceVersion?: number;
   kycDocumentType?: string;
   kycIdImage?: string;
+  kycIdImageBack?: string;
   kycSelfieImage?: string;
   kycSubmittedAt?: number;
+  kycDob?: string;
+  kycDocNumber?: string;
+  kycDocType?: string;
+  kycCountry?: string;
   affiliateCode?: string;
   affiliateBalance?: number;
   referralsCount?: number;
