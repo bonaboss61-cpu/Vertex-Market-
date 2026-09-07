@@ -1171,9 +1171,15 @@ async function setupServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Vertex Market Server successfully booted on http://localhost:${PORT}`);
-  });
+  if (process.env.VERCEL !== '1' && process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Vertex Market Server successfully booted on http://localhost:${PORT}`);
+    });
+  }
 }
 
-setupServer();
+if (process.env.VERCEL !== '1') {
+  setupServer();
+}
+
+export default app;
