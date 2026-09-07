@@ -4,6 +4,7 @@
  */
 
 import nodemailer from 'nodemailer';
+import { adminDb } from './src/lib/firebase-admin.ts';
 import express from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -111,7 +112,7 @@ app.post('/api/auth/send-otp', async (req, res) => {
   res.json({ success: true, otp: emailSent ? undefined : otp });
 });
 
-app.post('/api/auth/verify-otp', (req, res) => {
+app.post('/api/auth/verify-otp', async (req, res) => {
   const { email, otp } = req.body;
   if (!email || !otp) {
     res.status(400).json({ error: 'Email and OTP are required' });
@@ -133,9 +134,9 @@ app.post('/api/auth/verify-otp', (req, res) => {
   res.json({ success: true });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
-  const db = readDb();
+  const db = await readDb();
   const user = db.accounts.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
   
   if (!user) {
@@ -170,7 +171,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
     }
   }
   
-  const db = readDb();
+  const db = await readDb();
   const user = db.accounts.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
   
   if (!user) {
@@ -179,7 +180,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
   
   user.password = newPassword;
-  writeDb(db);
+  await writeDb(db);
   delete otpStore[email.toLowerCase()];
   
   res.json({ success: true, message: 'Password updated successfully' });
@@ -377,196 +378,62 @@ import fs from 'fs';
 const DB_PATH = path.join(process.cwd(), 'db.json');
 
 // Helper to read JSON DB
-function readDb() {
-  if (!fs.existsSync(DB_PATH)) {
-    const defaultDb = {
-      accounts: [
-        {
-          email: "bonaboss61@gmail.com",
-          fullName: "Bona Boss",
-          balanceDemo: 10000.0,
-          balanceLive: 0.0,
-          level: 1,
-          xp: 0,
-          kycStatus: "VERIFIED",
-          joinedTournaments: [],
-          tournamentScores: {},
-          weeklyProfit: 0
-        }
-      ],
-      transactions: [],
-      settings: {
-        platformProfit: 0,
-        platformCutPercent: 30,
-        minDeposit: 10,
-        minWithdraw: 20,
-        globalWinRate: 50,
-        cryptoAddresses: {
-          BTC: '',
-          ETH: '',
-          USDT_TRC20: '',
-          SOL: ''
-        }
-      }
-    };
-    fs.writeFileSync(DB_PATH, JSON.stringify(defaultDb, null, 2), 'utf-8');
-    return defaultDb;
-  }
+
+async function readDb() {
   try {
-    const content = fs.readFileSync(DB_PATH, 'utf-8');
-    return JSON.parse(content);
+    const doc = await adminDb.collection('system').doc('db').get();
+    if (!doc.exists) {
+      const defaultDb = {
+        accounts: [
+          {
+            email: "bonaboss61@gmail.com",
+            fullName: "Bona Boss",
+            balanceDemo: 10000.0,
+            balanceLive: 0.0,
+            level: 1,
+            xp: 0,
+            kycStatus: "VERIFIED",
+            joinedTournaments: [],
+            tournamentScores: {},
+            weeklyProfit: 0
+          }
+        ],
+        transactions: [],
+        settings: {
+          platformProfit: 0,
+          platformCutPercent: 30,
+          minDeposit: 10,
+          minWithdraw: 20,
+          globalWinRate: 50,
+          cryptoAddresses: {
+            BTC: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
+            ETH: '0x71C7656EC7ab88b098defB751B7401B5f6d1476B',
+            USDT_TRC20: 'TXCdtvQp7Lsk6M5r9eKDu8VpTL5S89NdfA',
+            SOL: 'HN7cABviJHU7LsX1767bVpTL5SnF2G3K9vXb9Nd'
+          }
+        }
+      };
+      await adminDb.collection('system').doc('db').set(defaultDb);
+      return defaultDb;
+    }
+    return doc.data();
   } catch (err) {
-    console.error('Error parsing db.json:', err);
-    return { accounts: [], transactions: [], settings: { platformProfit: 1450, platformCutPercent: 5, minDeposit: 10, minWithdraw: 20, globalWinRate: 50, cryptoAddresses: { BTC: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa', ETH: '0x71C7656EC7ab88b098defB751B7401B5f6d1476B', USDT_TRC20: 'TXCdtvQp7Lsk6M5r9eKDu8VpTL5S89NdfA', SOL: 'HN7cABviJHU7LsX1767bVpTL5SnF2G3K9vXb9Nd' } } };
+    console.error('Error reading from Firestore:', err);
+    return { accounts: [], transactions: [], settings: {} };
   }
 }
+
 
 // Helper to write JSON DB
-function writeDb(data: any) {
+
+async function writeDb(data: any) {
   try {
-    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+    await adminDb.collection('system').doc('db').set(data);
   } catch (err) {
-    console.error('Error writing to db.json:', err);
+    console.error('Error writing to Firestore:', err);
   }
 }
 
-// Ensure database is initialized on server startup
-readDb();
-
-// 1. Sync User Account State
-app.post('/api/user/sync', (req, res) => {
-  const userAccount = req.body;
-  if (!userAccount || !userAccount.email) {
-    res.status(400).json({ error: 'Valid user account with email is required' });
-    return;
-  }
-
-  const db = readDb();
-  let existingUser = db.accounts.find((u: any) => u.email.toLowerCase() === userAccount.email.toLowerCase());
-
-  if (!existingUser) {
-    // Register new user on backend
-    existingUser = {
-      password: userAccount.password,
-      securityAnswer: userAccount.securityAnswer,
-      ...userAccount,
-      balanceDemo: userAccount.balanceDemo ?? 10000.0,
-      balanceLive: userAccount.balanceLive ?? 0.0,
-      level: userAccount.level ?? 1,
-      xp: userAccount.xp ?? 0,
-      kycStatus: userAccount.kycStatus ?? 'UNVERIFIED',
-      joinedTournaments: userAccount.joinedTournaments ?? [],
-      tournamentScores: userAccount.tournamentScores ?? {},
-      weeklyProfit: userAccount.weeklyProfit ?? 0,
-      totalDeposits: userAccount.totalDeposits ?? 0,
-      liveTradeVolume: userAccount.liveTradeVolume ?? 0
-    };
-    db.accounts.push(existingUser);
-    writeDb(db);
-  } else {
-    // Sync user state back to client but update server database dynamically.
-    // Allow server-side admin updates of balance and KYC to propagate to the client!
-    existingUser.level = userAccount.level ?? existingUser.level;
-    existingUser.xp = userAccount.xp ?? existingUser.xp;
-    existingUser.joinedTournaments = userAccount.joinedTournaments ?? existingUser.joinedTournaments;
-    existingUser.tournamentScores = userAccount.tournamentScores ?? existingUser.tournamentScores;
-    existingUser.weeklyProfit = userAccount.weeklyProfit ?? existingUser.weeklyProfit;
-    existingUser.fullName = userAccount.fullName ?? existingUser.fullName;
-    
-    // Accept client balance unless server has updated it (via admin/deposits)
-    if (userAccount.adminBalanceVersion === existingUser.adminBalanceVersion || existingUser.adminBalanceVersion === undefined) {
-      existingUser.balanceLive = userAccount.balanceLive ?? existingUser.balanceLive;
-      existingUser.balanceDemo = userAccount.balanceDemo ?? existingUser.balanceDemo;
-      if (userAccount.liveTradeVolume !== undefined) {
-        existingUser.liveTradeVolume = Math.max(existingUser.liveTradeVolume || 0, userAccount.liveTradeVolume);
-      }
-    }
-    
-    // Write back changes
-    writeDb(db);
-  }
-
-  res.json({ success: true, account: existingUser, settings: db.settings });
-});
-
-// 2. Submit Transaction (Deposit or Withdraw)
-app.post('/api/user/transaction', (req, res) => {
-  const { email, type, amount, bonus, channel, details } = req.body;
-  if (!email || !type || !amount) {
-    res.status(400).json({ error: 'Missing transaction parameters' });
-    return;
-  }
-
-  const db = readDb();
-  const user = db.accounts.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
-  
-  if (!user) {
-    res.status(404).json({ error: 'User account not found' });
-    return;
-  }
-
-  // Generate real unique transaction ID
-  const txId = 'tx_' + Math.floor(Math.random() * 900000000 + 100000000);
-
-  const newTx: any = {
-    id: txId,
-    email,
-    type,
-    amount: parseFloat(amount),
-    bonus: parseFloat(bonus || 0),
-    channel,
-    status: req.body.status || (type === 'deposit' ? 'APPROVED' : 'PENDING'),
-    details: details || {},
-    timestamp: Date.now()
-  };
-
-  if (newTx.status === 'APPROVED' && type === 'deposit') {
-    newTx.approvedAt = Date.now();
-    const totalAdded = newTx.amount + newTx.bonus;
-    user.balanceLive = parseFloat((user.balanceLive + totalAdded).toFixed(2));
-    if (!user.hasClaimedInitialBonus && newTx.bonus > 0) {
-      user.hasClaimedInitialBonus = true;
-    }
-  } else if (type === 'withdraw') {
-    const withdrawAmount = parseFloat(amount);
-    if (user.balanceLive < withdrawAmount) {
-      res.status(400).json({ error: 'Insufficient Live balance to withdraw' });
-      return;
-    }
-    
-    // Enforce trade volume equivalent to deposits
-    const requiredVolume = user.totalDeposits || 0;
-    const currentVolume = user.liveTradeVolume || 0;
-    if (requiredVolume > 0 && currentVolume < requiredVolume) {
-      res.status(400).json({ error: `You must reach a live trading volume equivalent to your total deposits (${requiredVolume.toFixed(2)}) before withdrawing. Your current volume is ${currentVolume.toFixed(2)}.` });
-      return;
-    }
-    user.balanceLive = parseFloat((user.balanceLive - withdrawAmount).toFixed(2));
-    
-    // Calculate platform fee / cut (30% by default)
-    const cutPercent = db.settings.platformCutPercent || 30;
-    newTx.payoutCut = parseFloat((withdrawAmount * (cutPercent / 100)).toFixed(2));
-    newTx.payoutNet = parseFloat((withdrawAmount - newTx.payoutCut).toFixed(2));
-  }
-
-  db.transactions.push(newTx);
-  writeDb(db);
-
-  res.json({ success: true, transaction: newTx, balanceLive: user.balanceLive });
-});
-
-// 3. Get User Transaction History
-app.get('/api/user/transactions', (req, res) => {
-  const { email } = req.query;
-  if (!email) {
-    res.status(400).json({ error: 'Email parameter required' });
-    return;
-  }
-
-  const db = readDb();
-  const userTxs = db.transactions.filter((tx: any) => tx.email.toLowerCase() === (email as string).toLowerCase());
-  res.json({ success: true, transactions: userTxs.reverse() });
-});
 
 // --- FLUTTERWAVE GATEWAY DIRECT PAYMENT LINK ---
 app.post('/api/flutterwave/initialize', async (req, res) => {
@@ -576,7 +443,7 @@ app.post('/api/flutterwave/initialize', async (req, res) => {
     return;
   }
 
-  const db = readDb();
+  const db = await readDb();
   const user = db.accounts.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
   if (!user) {
     res.status(404).json({ error: 'User account not found' });
@@ -607,7 +474,7 @@ app.post('/api/flutterwave/initialize', async (req, res) => {
   };
 
   db.transactions.push(newTx);
-  writeDb(db);
+  await writeDb(db);
 
   // If credentials are MOCK or missing, simulate checkout link to prevent blocking the developer preview!
   if (!process.env.FLW_SECRET_KEY || process.env.FLW_SECRET_KEY.includes('MOCK')) {
@@ -696,7 +563,7 @@ app.get('/api/flutterwave/callback', async (req, res) => {
 
   // If it's a mock checkout verification
   if (transaction_id && (transaction_id as string).startsWith('mock_tr_')) {
-    const db = readDb();
+    const db = await readDb();
     const tx = db.transactions.find((t: any) => t.id === tx_ref);
     if (tx && tx.status === 'PENDING') {
       tx.status = 'APPROVED';
@@ -712,7 +579,7 @@ app.get('/api/flutterwave/callback', async (req, res) => {
         user.adminBalanceVersion = (user.adminBalanceVersion || 0) + 1;
         user.adminBalanceVersion = (user.adminBalanceVersion || 0) + 1;
       }
-      writeDb(db);
+      await writeDb(db);
     }
     // Redirect back to the web application with a beautiful success message!
     res.send(`
@@ -742,7 +609,7 @@ app.get('/api/flutterwave/callback', async (req, res) => {
 
     const data = await response.json();
     if (data.status === 'success' && data.data && (data.data.status === 'successful' || data.data.status === 'completed')) {
-      const db = readDb();
+      const db = await readDb();
       const tx = db.transactions.find((t: any) => t.id === tx_ref);
 
       if (tx) {
@@ -766,7 +633,7 @@ app.get('/api/flutterwave/callback', async (req, res) => {
             user.adminBalanceVersion = (user.adminBalanceVersion || 0) + 1;
             user.adminBalanceVersion = (user.adminBalanceVersion || 0) + 1;
           }
-          writeDb(db);
+          await writeDb(db);
         }
 
         // Return beautiful success UI
@@ -821,14 +688,14 @@ app.get('/api/klines', async (req, res) => {
 });
 
 
-app.delete('/api/admin/users/:email', (req, res) => {
+app.delete('/api/admin/users/:email', async (req, res) => {
   const { email } = req.params;
-  const db = readDb();
+  const db = await readDb();
   const initialLength = db.accounts.length;
   db.accounts = db.accounts.filter((u: any) => u.email.toLowerCase() !== email.toLowerCase());
   
   if (db.accounts.length < initialLength) {
-    writeDb(db);
+    await writeDb(db);
     res.json({ success: true, message: 'User deleted' });
   } else {
     res.status(404).json({ error: 'User not found' });
@@ -836,8 +703,8 @@ app.delete('/api/admin/users/:email', (req, res) => {
 });
 
 // 4. Admin API: Get All System Data
-app.get('/api/admin/data', (req, res) => {
-  const db = readDb();
+app.get('/api/admin/data', async (req, res) => {
+  const db = await readDb();
   res.json({
     success: true,
     accounts: db.accounts,
@@ -847,33 +714,33 @@ app.get('/api/admin/data', (req, res) => {
 });
 
 // 5. Admin API: Update Global Settings
-app.get('/api/settings', (req, res) => {
-  const db = readDb();
+app.get('/api/settings', async (req, res) => {
+  const db = await readDb();
   res.json({ success: true, settings: db.settings });
 });
 
-app.post('/api/admin/settings', (req, res) => {
+app.post('/api/admin/settings', async (req, res) => {
   const newSettings = req.body;
-  const db = readDb();
+  const db = await readDb();
   
   db.settings = {
     ...db.settings,
     ...newSettings
   };
   
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, settings: db.settings });
 });
 
 // 6. Admin API: Adjust User Balance Direct
-app.post('/api/admin/adjust-balance', (req, res) => {
+app.post('/api/admin/adjust-balance', async (req, res) => {
   const { email, amount, balanceType } = req.body; // balanceType = 'live' or 'demo'
   if (!email || amount === undefined || !balanceType) {
     res.status(400).json({ error: 'Missing balance adjustment parameters' });
     return;
   }
 
-  const db = readDb();
+  const db = await readDb();
   const user = db.accounts.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
 
   if (!user) {
@@ -889,7 +756,7 @@ app.post('/api/admin/adjust-balance', (req, res) => {
   }
   user.adminBalanceVersion = (user.adminBalanceVersion || 0) + 1;
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, account: user });
 });
 
@@ -901,7 +768,7 @@ app.post('/api/admin/approve', async (req, res) => {
     return;
   }
 
-  const db = readDb();
+  const db = await readDb();
   const tx = db.transactions.find((t: any) => t.id === txId);
 
   if (!tx) {
@@ -945,19 +812,19 @@ app.post('/api/admin/approve', async (req, res) => {
     user.adminBalanceVersion = (user.adminBalanceVersion || 0) + 1;
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, transaction: tx, account: user, settings: db.settings });
 });
 
 // 8. Admin API: Reject Transaction Request
-app.post('/api/admin/reject', (req, res) => {
+app.post('/api/admin/reject', async (req, res) => {
   const { txId } = req.body;
   if (!txId) {
     res.status(400).json({ error: 'Transaction ID is required' });
     return;
   }
 
-  const db = readDb();
+  const db = await readDb();
   const tx = db.transactions.find((t: any) => t.id === txId);
 
   if (!tx) {
@@ -985,7 +852,7 @@ app.post('/api/admin/reject', (req, res) => {
     user.adminBalanceVersion = (user.adminBalanceVersion || 0) + 1;
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true, transaction: tx, account: user });
 });
 
@@ -1021,11 +888,11 @@ app.post('/api/admin/test-email', async (req, res) => {
 
 
 // Admin API: KYC Actions
-app.post('/api/admin/kyc/approve', (req, res) => {
+app.post('/api/admin/kyc/approve', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
 
-  const db = readDb();
+  const db = await readDb();
   const user = db.accounts.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
   
   if (!user) return res.status(404).json({ error: 'User not found' });
@@ -1033,15 +900,15 @@ app.post('/api/admin/kyc/approve', (req, res) => {
   user.kycStatus = 'VERIFIED';
   user.xp = (user.xp || 0) + 150; // Grant XP for verification
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true });
 });
 
-app.post('/api/admin/kyc/reject', (req, res) => {
+app.post('/api/admin/kyc/reject', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
 
-  const db = readDb();
+  const db = await readDb();
   const user = db.accounts.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
   
   if (!user) return res.status(404).json({ error: 'User not found' });
@@ -1050,7 +917,7 @@ app.post('/api/admin/kyc/reject', (req, res) => {
   user.kycIdImage = undefined;
   user.kycSelfieImage = undefined;
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ success: true });
 });
 
@@ -1062,7 +929,7 @@ app.post('/api/kyc/auto-verify', async (req, res) => {
     return res.status(400).json({ error: 'Missing required KYC payload' });
   }
 
-  const db = readDb();
+  const db = await readDb();
   const user = db.accounts.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
   
   if (!user) return res.status(404).json({ error: 'User not found' });
@@ -1081,7 +948,7 @@ app.post('/api/kyc/auto-verify', async (req, res) => {
   // If Gemini is not configured, fall back to PENDING (manual review)
   if (!ai) {
     user.kycStatus = 'PENDING';
-    writeDb(db);
+    await writeDb(db);
     return res.json({ success: true, status: 'PENDING', message: 'Submitted for manual review.' });
   }
 
@@ -1134,23 +1001,23 @@ app.post('/api/kyc/auto-verify', async (req, res) => {
 
     if (analysis.unclear) {
       user.kycStatus = 'PENDING'; // Send to manual review even if AI thinks it is unclear
-      writeDb(db);
+      await writeDb(db);
       return res.json({ success: true, status: 'PENDING', message: analysis.reason });
     } else if (analysis.verified) {
       user.kycStatus = 'VERIFIED';
       user.xp = (user.xp || 0) + 150; // XP reward
-      writeDb(db);
+      await writeDb(db);
       return res.json({ success: true, status: 'VERIFIED', message: analysis.reason });
     } else {
       user.kycStatus = 'PENDING'; // send to manual review
-      writeDb(db);
+      await writeDb(db);
       return res.json({ success: true, status: 'PENDING', message: analysis.reason });
     }
   } catch (err: any) {
     console.error('KYC Auto-Verify Error:', err);
     // On AI failure, default to pending for manual review
     user.kycStatus = 'PENDING';
-    writeDb(db);
+    await writeDb(db);
     return res.json({ success: true, status: 'PENDING', message: 'AI verification failed, falling back to manual review.' });
   }
 });
@@ -1166,7 +1033,7 @@ async function setupServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*', async (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
