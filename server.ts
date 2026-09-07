@@ -436,181 +436,94 @@ async function writeDb(data: any) {
 
 
 // --- FLUTTERWAVE GATEWAY DIRECT PAYMENT LINK ---
-app.post('/api/flutterwave/initialize', async (req, res) => {
-  const { email, fullName, amount, currency, paymentMethod } = req.body;
+app.post('/api/paystack/initialize', async (req, res) => {
+  const { email, amount, currency, paymentMethod, fullName } = req.body;
   if (!email || !amount) {
-    res.status(400).json({ error: 'Email and amount are required' });
-    return;
-  }
-
-  const db = await readDb();
-  const user = db.accounts.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
-  if (!user) {
-    res.status(404).json({ error: 'User account not found' });
-    return;
-  }
-
-  const resolvedAmount = parseFloat(amount);
-  const isInitialDepositBonus = !user.hasClaimedInitialBonus;
-  const bonusAmount = isInitialDepositBonus ? resolvedAmount * 0.5 : 0;
-
-  // Generate unique transaction reference ID
-  const txId = 'flw_' + Math.floor(Math.random() * 900000000 + 100000000);
-
-  const newTx = {
-    id: txId,
-    email,
-    type: 'deposit',
-    amount: resolvedAmount,
-    bonus: bonusAmount,
-    channel: 'Flutterwave Gateway',
-    status: 'PENDING',
-    details: {
-      currency: currency || 'USD',
-      fullName: fullName || user.fullName || 'Vertex Trader',
-      initializedAt: Date.now()
-    },
-    timestamp: Date.now()
-  };
-
-  db.transactions.push(newTx);
-  await writeDb(db);
-
-  // If credentials are MOCK or missing, simulate checkout link to prevent blocking the developer preview!
-  if (!process.env.FLW_SECRET_KEY || process.env.FLW_SECRET_KEY.includes('MOCK')) {
-    console.log('Using mock Flutterwave checkout link (Sandbox Mode)');
-    const appUrl = process.env.APP_URL || (req.headers.origin ? req.headers.origin : req.protocol + '://' + req.get('host'));
-    const mockLink = `${appUrl}/api/flutterwave/callback?status=successful&tx_ref=${txId}&transaction_id=mock_tr_${Math.floor(Math.random()*1000000)}`;
-    res.json({
-      success: true,
-      checkoutUrl: mockLink,
-      transaction: newTx,
-      isMock: true,
-      txId: txId,
-      publicKey: process.env.FLW_PUBLIC_KEY || "FLWPUBK_TEST-SANDBOXDEMOKEY-X"
-    });
-    return;
+    return res.status(400).json({ error: 'Email and amount are required' });
   }
 
   try {
-    const appUrl = process.env.APP_URL || (req.headers.origin ? req.headers.origin : req.protocol + '://' + req.get('host'));
-    let flutterwaveOptions = 'card, banktransfer, ussd, mobilemoney, qr';
-    let finalAmount = resolvedAmount;
-    let finalCurrency = currency || 'USD';
-
-    if (paymentMethod === 'card') {
-      flutterwaveOptions = 'card';
-    } else if (paymentMethod === 'bank') {
-      flutterwaveOptions = 'banktransfer';
-      // Bank transfers in Flutterwave are mostly supported in NGN
-      if (finalCurrency === 'USD') {
-        finalCurrency = 'NGN';
-        finalAmount = resolvedAmount * 1500; // Exchange rate conversion
-      }
+    const db = await readDb();
+    const user = db.accounts.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    const response = await fetch('https://api.flutterwave.com/v3/payments', {
+    const txId = 'tx_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    const tx = {
+      id: txId,
+      email,
+      type: 'deposit',
+      amount: parseFloat(amount),
+      status: 'PENDING',
+      timestamp: Date.now(),
+      details: {
+        method: paymentMethod || 'paystack',
+        currency: currency || 'USD',
+        provider: 'paystack'
+      }
+    };
+    db.transactions.push(tx);
+    await writeDb(db);
+
+    const appUrl = process.env.VITE_APP_URL || (req.headers.origin ? req.headers.origin : 'http://localhost:3000');
+    
+    const response = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.FLW_SECRET_KEY}`,
+        'Authorization': `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        tx_ref: txId,
-        amount: finalAmount,
-        currency: finalCurrency,
-        payment_options: flutterwaveOptions,
-        redirect_url: `${appUrl}/api/flutterwave/callback`,
-        customer: {
-          email: email,
-          name: fullName || user.fullName || 'Vertex Trader'
-        },
-        customizations: {
-          title: 'Vertex Market Capital',
-          description: `Live Account Capital Fund (${resolvedAmount.toLocaleString()})`,
-          logo: 'https://cdn-icons-png.flaticon.com/512/2933/2933116.png'
+        email: email,
+        amount: amount * 100, // Paystack uses Kobo/Cents
+        reference: txId,
+        callback_url: `${appUrl}/api/paystack/callback`,
+        metadata: {
+          custom_fields: [
+            {
+              display_name: "Full Name",
+              variable_name: "full_name",
+              value: fullName || "User"
+            }
+          ]
         }
       })
     });
 
     const data = await response.json();
-    if (data.status === 'success' && data.data && data.data.link) {
-      res.json({
-        success: true,
-        checkoutUrl: data.data.link,
-        transaction: newTx,
-        txId: txId,
-        publicKey: process.env.FLW_PUBLIC_KEY
-      });
+    if (data.status) {
+      res.json({ success: true, checkoutUrl: data.data.authorization_url, transaction: tx });
     } else {
-      console.error('Flutterwave initialization returned error:', data);
-      res.status(500).json({ error: data.message || 'Failed to create payment gateway link' });
+      res.status(400).json({ error: data.message });
     }
   } catch (err: any) {
-    console.error('Flutterwave initialization API exception:', err);
-    res.status(500).json({ error: 'Payment gateway communication failure: ' + err.message });
+    console.error('Paystack init error:', err);
+    res.status(500).json({ error: 'Failed to initialize Paystack gateway' });
   }
 });
 
-// --- FLUTTERWAVE GATEWAY SUCCESS CALLBACK REDIRECT ---
-app.get('/api/flutterwave/callback', async (req, res) => {
-  const { status, tx_ref, transaction_id } = req.query;
+app.get('/api/paystack/callback', async (req, res) => {
+  const { trxref, reference } = req.query;
+  const txId = reference || trxref;
 
-  if (!tx_ref) {
-    res.status(400).send('<h1>Error</h1><p>Missing transaction reference (tx_ref).</p>');
-    return;
+  if (!txId) {
+    return res.redirect('/trade?deposit=failed');
   }
 
-  // If it's a mock checkout verification
-  if (transaction_id && (transaction_id as string).startsWith('mock_tr_')) {
-    const db = await readDb();
-    const tx = db.transactions.find((t: any) => t.id === tx_ref);
-    if (tx && tx.status === 'PENDING') {
-      tx.status = 'APPROVED';
-      tx.approvedAt = Date.now();
-      tx.details = { ...tx.details, verifiedBy: 'mock_sandbox', transactionId: transaction_id };
-
-      const user = db.accounts.find((u: any) => u.email.toLowerCase() === tx.email.toLowerCase());
-      if (user) {
-        const addedBalance = tx.amount + (tx.bonus || 0);
-        user.balanceLive = parseFloat((user.balanceLive + addedBalance).toFixed(2));
-        user.totalDeposits = (user.totalDeposits || 0) + tx.amount;
-        user.hasClaimedInitialBonus = true; // Claim the welcome promo
-        user.adminBalanceVersion = (user.adminBalanceVersion || 0) + 1;
-        user.adminBalanceVersion = (user.adminBalanceVersion || 0) + 1;
-      }
-      await writeDb(db);
-    }
-    // Redirect back to the web application with a beautiful success message!
-    res.send(`
-      <html>
-        <body style="background: #080c14; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 20px; text-align: center;">
-          <div style="background: #0a0f1d; border: 1px solid #10b981; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: 400px; width: 100%;">
-            <div style="font-size: 50px; margin-bottom: 20px;">✔️</div>
-            <h1 style="font-size: 20px; margin: 0 0 10px 0; color: #10b981; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Deposit Successful</h1>
-            <p style="color: #9ca3af; font-size: 14px; line-height: 1.6; margin: 0 0 25px 0;">Your sandbox payment reference has been processed. Capital reserves are successfully settled in your Live balance.</p>
-            <button onclick="window.close(); if(window.opener){window.opener.location.reload();window.opener.focus();}else{window.location.href='/';}" style="background: #10b981; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.2s; font-size: 13px;">Return to Terminal</button>
-          </div>
-        </body>
-      </html>
-    `);
-    return;
-  }
-
-  // Real Flutterwave transaction verification
   try {
-    const response = await fetch(`https://api.flutterwave.com/v3/transactions/${transaction_id}/verify`, {
+    const response = await fetch(`https://api.paystack.co/transaction/verify/${txId}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${process.env.FLW_SECRET_KEY}`,
+        'Authorization': `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
         'Content-Type': 'application/json'
       }
     });
 
     const data = await response.json();
-    if (data.status === 'success' && data.data && (data.data.status === 'successful' || data.data.status === 'completed')) {
+    if (data.status && data.data && data.data.status === 'success') {
       const db = await readDb();
-      const tx = db.transactions.find((t: any) => t.id === tx_ref);
+      const tx = db.transactions.find((t: any) => t.id === txId);
 
       if (tx) {
         if (tx.status === 'PENDING') {
@@ -618,61 +531,29 @@ app.get('/api/flutterwave/callback', async (req, res) => {
           tx.approvedAt = Date.now();
           tx.details = { 
             ...tx.details, 
-            verifiedAt: Date.now(), 
-            transactionId: transaction_id,
-            currency: data.data.currency,
-            channel: data.data.payment_type
+            paystack_ref: data.data.reference 
           };
 
           const user = db.accounts.find((u: any) => u.email.toLowerCase() === tx.email.toLowerCase());
           if (user) {
-            const addedBalance = tx.amount + (tx.bonus || 0);
-            user.balanceLive = parseFloat((user.balanceLive + addedBalance).toFixed(2));
+            user.balanceLive = parseFloat((user.balanceLive + tx.amount).toFixed(2));
             user.totalDeposits = (user.totalDeposits || 0) + tx.amount;
-            user.hasClaimedInitialBonus = true; // Claim the promo
-            user.adminBalanceVersion = (user.adminBalanceVersion || 0) + 1;
-            user.adminBalanceVersion = (user.adminBalanceVersion || 0) + 1;
           }
           await writeDb(db);
         }
-
-        // Return beautiful success UI
-        res.send(`
-          <html>
-            <body style="background: #080c14; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 20px; text-align: center;">
-              <div style="background: #0a0f1d; border: 1px solid #10b981; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: 400px; width: 100%;">
-                <div style="font-size: 50px; margin-bottom: 20px;">✔️</div>
-                <h1 style="font-size: 20px; margin: 0 0 10px 0; color: #10b981; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Deposit Settled</h1>
-                <p style="color: #9ca3af; font-size: 14px; line-height: 1.6; margin: 0 0 25px 0;">Your real deposit of ${tx.amount.toFixed(2)} has been verified and settled successfully.</p>
-                <button onclick="window.close(); if(window.opener){window.opener.location.reload();window.opener.focus();}else{window.location.href='/';}" style="background: #10b981; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.2s; font-size: 13px;">Return to Terminal</button>
-              </div>
-            </body>
-          </html>
-        `);
+        res.redirect('/trade?deposit=success');
       } else {
-        res.status(404).send('<h1>Transaction Not Found</h1>');
+        res.redirect('/trade?deposit=failed');
       }
     } else {
-      res.status(400).send(`
-        <html>
-          <body style="background: #080c14; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 20px; text-align: center;">
-            <div style="background: #0a0f1d; border: 1px solid #ef4444; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: 400px; width: 100%;">
-              <div style="font-size: 50px; margin-bottom: 20px;">❌</div>
-              <h1 style="font-size: 20px; margin: 0 0 10px 0; color: #ef4444; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Payment Failed</h1>
-              <p style="color: #9ca3af; font-size: 14px; line-height: 1.6; margin: 0 0 25px 0;">Flutterwave payment verification failed or was cancelled by the user.</p>
-              <button onclick="window.close(); if(window.opener){window.opener.location.reload();window.opener.focus();}else{window.location.href='/';}" style="background: #ef4444; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.2s; font-size: 13px;">Back to Terminal</button>
-            </div>
-          </body>
-        </html>
-      `);
+      res.redirect('/trade?deposit=failed');
     }
-  } catch (err: any) {
-    console.error('Flutterwave callback verification failed:', err);
-    res.status(500).send('<h1>Server Error</h1><p>Failed to verify transaction: ' + err.message + '</p>');
+  } catch (err) {
+    console.error('Paystack verification error:', err);
+    res.redirect('/trade?deposit=error');
   }
 });
 
-// Kline Proxy
 app.get('/api/klines', async (req, res) => {
   try {
     const symbol = req.query.symbol;

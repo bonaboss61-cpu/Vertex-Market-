@@ -171,7 +171,7 @@ export default function DepositWithdrawModal({
   useEffect(() => {
     if (isOpen) {
       const script = document.createElement('script');
-      script.src = 'https://checkout.flutterwave.com/v3.js';
+      script.src = 'https://js.paystack.co/v1/inline.js';
       script.async = true;
       document.body.appendChild(script);
       return () => {
@@ -241,7 +241,7 @@ export default function DepositWithdrawModal({
     }
 
     if (account.isLive) {
-      // Live validation rules via Flutterwave
+      // Live validation rules via Paystack
       if (activeTab === 'withdraw') {
         if (!withdrawBankAccountNumber || withdrawBankAccountNumber.length < 8) {
           setErrorMsg('Please enter a valid 10-digit bank account number.');
@@ -331,7 +331,7 @@ export default function DepositWithdrawModal({
     const statuses = isLive 
       ? (activeTab === 'deposit'
           ? [
-              'Contacting Flutterwave Treasury Gateway...',
+              'Contacting Paystack Treasury Gateway...',
               'Securing transaction handshake token...',
               'Building hosted checkout payload...',
               'Generating invoice reference key...',
@@ -389,7 +389,7 @@ export default function DepositWithdrawModal({
                 return;
               }
 
-              const response = await apiFetch('/api/flutterwave/initialize', {
+              const response = await apiFetch('/api/paystack/initialize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -414,7 +414,7 @@ export default function DepositWithdrawModal({
                 onTriggerToast(
                   'LEVEL_UP',
                   'GATEWAY READY',
-                  'Complete payment on the secure Flutterwave checkout screen.'
+                  'Complete payment on the secure Paystack checkout screen.'
                 );
                 
                 // Open hosted page
@@ -446,7 +446,7 @@ export default function DepositWithdrawModal({
                 type: 'withdraw',
                 amount: resolvedAmount,
                 bonus: 0,
-                channel: 'Flutterwave Payout (Bank Wire)',
+                channel: 'Paystack Payout (Bank Wire)',
                 details: detailsPayload
               });
             if (!data.success) {
@@ -463,7 +463,7 @@ export default function DepositWithdrawModal({
               onTriggerToast(
                 'LEVEL_UP',
                 'WITHDRAWAL ENQUEUE',
-                `Your withdrawal of ${resolvedAmount.toFixed(2)} is pending admin approval and instant Flutterwave settlement.`
+                `Your withdrawal of ${resolvedAmount.toFixed(2)} is pending admin approval and instant Paystack settlement.`
               );
             }
           } catch (err: any) {
@@ -866,7 +866,7 @@ export default function DepositWithdrawModal({
                       <div className="flex flex-col gap-1">
                         <h4 className="text-white font-bold text-sm tracking-wide">Automated Bank Transfer</h4>
                         <p className="text-xs text-gray-400 font-sans leading-relaxed px-2">
-                          Your deposit will be securely processed via Flutterwave. A dynamic virtual account number will be generated for your transaction. 
+                          Your deposit will be securely processed via Paystack. A dynamic virtual account number will be generated for your transaction. 
                           <br/><br/>
                           Once you transfer the funds, your Live balance will be <strong>credited automatically</strong>.
                         </p>
@@ -1036,7 +1036,7 @@ export default function DepositWithdrawModal({
                 <p className="text-xs text-gray-400 max-w-sm leading-relaxed mt-1">
                   {account.isLive 
                     ? (activeTab === 'deposit' 
-                        ? 'Your secure payment gateway session has been successfully established via Flutterwave. Your Live Balance will update automatically upon successful payment.' 
+                        ? 'Your secure payment gateway session has been successfully established via Paystack. Your Live Balance will update automatically upon successful payment.' 
                         : 'Your withdrawal payout is registered. The platform commission (5% cut) has been calculated, and your net payout is pending administrative approval.')
                     : 'Your practice protocol payment record index hash has been processed and practice reserves are successfully reconciled.'}
                 </p>
