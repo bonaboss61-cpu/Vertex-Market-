@@ -936,8 +936,8 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
           </button>
         </div>
 
-        {/* Navigation Tabs (only shown if not in the middle of active KYC scanning) */}
-        {kycStep !== 3 && (
+        {/* Navigation Tabs (Hidden during KYC or if user is logged in) */}
+        {activeTab !== 'kyc' && !account?.isLoggedIn && (
           <div className="flex border-b border-white/5 bg-[#0a0f1b]" id="modal-tabs-header">
             <button
               onClick={() => { if (onPlaySound) onPlaySound('CLICK'); setActiveTab('login'); setAuthError(''); }}
@@ -958,26 +958,6 @@ const handleVerifyOtp = async (e: React.FormEvent) => {
               }`}
             >
               Create Account
-            </button>
-            <button
-              onClick={() => {
-                if (onPlaySound) onPlaySound('CLICK');
-                if (!account.isLoggedIn) {
-                  setAuthError('Please sign in or create an account before launching KYC verification.');
-                  setActiveTab('login');
-                  return;
-                }
-                setActiveTab('kyc');
-                setAuthError('');
-              }}
-              className={`flex-1 py-3 text-center text-xs font-sans font-medium border-b-2 transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === 'kyc'
-                  ? 'border-emerald-500 text-white bg-white/5'
-                  : 'border-transparent text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              Identity KYC
             </button>
           </div>
         )}
