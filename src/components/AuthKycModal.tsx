@@ -339,11 +339,21 @@ export default function AuthKycModal({
       const accountData = {
         email: email,
         fullName: derivedName,
-        isLoggedIn: true
+        isLoggedIn: true,
+        balanceDemo: 10000.0,
+        balanceLive: 0.0,
+        isLive: false,
+        level: 1,
+        xp: 0,
+        badges: [],
+        kycStatus: 'UNVERIFIED' as 'UNVERIFIED',
+        joinedTournaments: [],
+        tournamentScores: {},
+        weeklyProfit: 0,
       };
       const syncRes = await apiService.syncUser(accountData.email, accountData);
       if (syncRes.success && syncRes.account) {
-        if (onReplaceAccount) onReplaceAccount({ ...syncRes.account, isLoggedIn: true } as any);
+        if (onReplaceAccount) onReplaceAccount({ ...accountData, ...syncRes.account, isLoggedIn: true } as any);
       } else {
         if (onReplaceAccount) onReplaceAccount(accountData as any);
       }
