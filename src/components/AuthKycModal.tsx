@@ -352,7 +352,11 @@ export default function AuthKycModal({
       onClose();
     } catch (err: any) {
       console.error(err);
-      setAuthError((err as any)?.message || 'Incorrect email or password.');
+      let errMsg = (err as any)?.message || 'Incorrect email or password.';
+      if (errMsg.includes('auth/invalid-credential')) {
+        errMsg = 'Invalid email or password. Please check your credentials.';
+      }
+      setAuthError(errMsg);
     } finally {
       setIsLoading(false);
     }
@@ -438,7 +442,17 @@ export default function AuthKycModal({
       onClose();
     } catch (err: any) {
       console.error(err);
-      setAuthError((err as any)?.message || 'Failed to create account.');
+      let errMsg = (err as any)?.message || 'Failed to create account.';
+      if (errMsg.includes('auth/email-already-in-use')) {
+        errMsg = 'An account with this email already exists. Please sign in.';
+      } else if (errMsg.includes('auth/weak-password')) {
+        errMsg = 'Password is too weak. Please use a stronger password.';
+      } else if (errMsg.includes('auth/invalid-email')) {
+        errMsg = 'Please enter a valid email address.';
+      } else if (errMsg.includes('auth/invalid-credential')) {
+        errMsg = 'Invalid credentials provided.';
+      }
+      setAuthError(errMsg);
     } finally {
       setIsLoading(false);
     }
