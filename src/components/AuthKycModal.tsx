@@ -195,6 +195,12 @@ export default function AuthKycModal({
   const [activeTab, setActiveTab] = useState<'login' | 'signup' | 'kyc'>(initialTab);
   const [kycStep, setKycStep] = useState<number>(1); // 1 = details, 2 = upload, 3 = scanning/processing, 4 = approved
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
+
   // Auth Inputs
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
