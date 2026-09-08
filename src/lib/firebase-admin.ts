@@ -7,15 +7,23 @@ dotenv.config();
 
 let credential;
 try {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-    credential = cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY));
+  let rawKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (rawKey) {
+    // Clean up potential quotes if added by mistake
+    if (rawKey.startsWith("'") && rawKey.endsWith("'")) {
+      rawKey = rawKey.slice(1, -1);
+    }
+    credential = cert(JSON.parse(rawKey));
   }
 } catch (e) {
-  console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY', e);
+  console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:', e);
 }
 
-const app = getApps().length === 0 
-  ? initializeApp({ projectId: firebaseConfig.projectId, credential }) 
-  : getApp();
+const appOptions: any = { projectId: firebaseConfig.projectId };
+if (credential) {
+  appOptions.credential = credential;
+}
+
+const app = getApps().length === 0 ? initializeApp(appOptions) : getApp();
 
 export const adminDb = getFirestore(app);
