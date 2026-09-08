@@ -4,8 +4,7 @@
  */
 
 import nodemailer from 'nodemailer';
-import { db } from './src/lib/firebase.ts';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { adminDb } from './src/lib/firebase-admin.ts';
 import express from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -381,11 +380,11 @@ const DB_PATH = path.join(process.cwd(), 'db.json');
 // Helper to read JSON DB
 
 
+
 async function readDb() {
   try {
-    const docRef = doc(db, 'system', 'db');
-    const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) {
+    const doc = await adminDb.collection('system').doc('db').get();
+    if (!doc.exists) {
       const defaultDb = {
         accounts: [
           {
@@ -416,10 +415,10 @@ async function readDb() {
           }
         }
       };
-      await setDoc(docRef, defaultDb);
+      await adminDb.collection('system').doc('db').set(defaultDb);
       return defaultDb;
     }
-    return docSnap.data();
+    return doc.data();
   } catch (err) {
     console.error('Error reading from Firestore:', err);
     return { accounts: [], transactions: [], settings: {} };
@@ -430,10 +429,10 @@ async function readDb() {
 // Helper to write JSON DB
 
 
+
 async function writeDb(data: any) {
   try {
-    const docRef = doc(db, 'system', 'db');
-    await setDoc(docRef, data);
+    await adminDb.collection('system').doc('db').set(data);
   } catch (err) {
     console.error('Error writing to Firestore:', err);
   }
